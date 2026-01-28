@@ -12,7 +12,6 @@ import com.cursorminecraft.worldedit.BlockPlacementEngine;
 import com.cursorminecraft.worldedit.WorldEditSelectionHelper;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.regions.Region;
-import io.github.sashirestela.openai.domain.chat.Message;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -61,7 +60,7 @@ public class AIBuildCommand implements CommandExecutor, TabCompleter {
     private void handleTool(Player player) {
         ItemStack wand = new ItemStack(Material.WOODEN_AXE);
         player.getInventory().addItem(wand);
-        player.sendMessage("§a[CursorAI] Provided WorldEdit wand. Use left/right click to select a region.");
+        player.sendMessage("§a[CFM] Provided WorldEdit wand. Use left/right click to select a region.");
     }
 
     private void handleCreate(Player player, String[] args) {
@@ -73,14 +72,14 @@ public class AIBuildCommand implements CommandExecutor, TabCompleter {
         String prompt = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
 
         if (!WorldEditSelectionHelper.hasValidSelection(player)) {
-            player.sendMessage("§c[CursorAI] Please select a region first with WorldEdit!");
+            player.sendMessage("§c[CFM] Please select a region first with WorldEdit!");
             return;
         }
 
         Region region = WorldEditSelectionHelper.getPlayerSelection(player);
         BlockVector3 origin = region.getMinimumPoint();
 
-        player.sendMessage("§e[CursorAI] Thinking... Generating structure...");
+        player.sendMessage("§e[CFM] Thinking... Generating structure...");
 
         // Start a new conversation and send message
         Conversation conv = Conversation.builder()
@@ -94,7 +93,7 @@ public class AIBuildCommand implements CommandExecutor, TabCompleter {
 
         conversationService.sendMessage(convId, prompt).thenAccept(response -> {
             if (response == null) {
-                player.sendMessage("§c[CursorAI] AI failed to generate a build. Try again.");
+                player.sendMessage("§c[CFM] AI failed to generate a build. Try again.");
                 return;
             }
 
@@ -104,10 +103,10 @@ public class AIBuildCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage("§f[AI Chat]: " + response);
                 } else {
                     BlockPlacementEngine.placeBuild(player, blocks, origin);
-                    player.sendMessage("§a[CursorAI] Build complete! (" + blocks.size() + " blocks placed)");
+                    player.sendMessage("§a[CFM] Build complete! (" + blocks.size() + " blocks placed)");
                 }
             } catch (Exception e) {
-                player.sendMessage("§f[AI Chat]: " + response);
+                player.sendMessage("§f[CFM Chat]: " + response);
                 Logger.error("Failed to parse as build, showing as chat message");
             }
         });
@@ -115,7 +114,7 @@ public class AIBuildCommand implements CommandExecutor, TabCompleter {
 
     private void handleParse(Player player) {
         if (!WorldEditSelectionHelper.hasValidSelection(player)) {
-            player.sendMessage("§c[CursorAI] Please select a region first!");
+            player.sendMessage("§c[CFM] Please select a region first!");
             return;
         }
 
@@ -123,37 +122,37 @@ public class AIBuildCommand implements CommandExecutor, TabCompleter {
         try {
             String json = WorldEditToVoxelParser.convertRegionToJson(player.getWorld(), region);
             Logger.info("Selection JSON: " + json);
-            player.sendMessage("§a[CursorAI] Selection parsed! JSON outputted to console/logs.");
+            player.sendMessage("§a[CFM] Selection parsed! JSON outputted to console/logs.");
             player.sendMessage("§7(Check server logs for the full JSON schema)");
         } catch (Exception e) {
-            player.sendMessage("§c[CursorAI] Error parsing selection: " + e.getMessage());
+            player.sendMessage("§c[CFM] Error parsing selection: " + e.getMessage());
         }
     }
 
     private void handleJsonParse(Player player, String[] args) {
-        player.sendMessage("§e[CursorAI] Feature coming soon via Web Interface!");
+        player.sendMessage("§e[CFM] Feature coming soon via Web Interface!");
     }
 
     private void handleList(Player player) {
         List<Conversation> conversations = CursorMinecraft.getInstance().getConversationDAO()
                 .getConversationsByUser(player.getUniqueId().toString());
         if (conversations.isEmpty()) {
-            player.sendMessage("§e[CursorAI] No active conversations found.");
+            player.sendMessage("§e[CFM] No active conversations found.");
             return;
         }
-        player.sendMessage("§b--- Your Conversations ---");
+        player.sendMessage("§b--- Your CFM Conversations ---");
         for (Conversation conv : conversations) {
             player.sendMessage("§f- [ID: " + conv.getId() + "] " + conv.getTitle());
         }
     }
 
     private void sendHelp(Player player) {
-        player.sendMessage("§b--- Cursor for Minecraft Help ---");
-        player.sendMessage("§f/aibuild tool §7- Get WorldEdit selection tool");
-        player.sendMessage("§f/aibuild create <prompt> §7- Generate build in selection");
-        player.sendMessage("§f/aibuild parse §7- Selection to JSON schema (Console output)");
-        player.sendMessage("§f/aibuild list §7- List your AI conversations");
-        player.sendMessage("§f/aibuild help §7- Show this message");
+        player.sendMessage("§b--- CFM (Cursor for Minecraft) Help ---");
+        player.sendMessage("§f/cfm tool §7- Get WorldEdit selection tool");
+        player.sendMessage("§f/cfm create <prompt> §7- Generate build in selection");
+        player.sendMessage("§f/cfm parse §7- Selection to JSON schema (Console output)");
+        player.sendMessage("§f/cfm list §7- List your CFM conversations");
+        player.sendMessage("§f/cfm help §7- Show this message");
     }
 
     @Override

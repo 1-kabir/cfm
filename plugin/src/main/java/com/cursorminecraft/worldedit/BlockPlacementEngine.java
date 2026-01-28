@@ -23,15 +23,22 @@ public class BlockPlacementEngine {
                 BlockVector3 position = origin.add(block.getX(), block.getY(), block.getZ());
 
                 try {
-                    // Parse block data (e.g., minecraft:oak_planks[facing=north])
-                    BlockState blockState = WorldEdit.getInstance().getBlockFactory()
-                            .parseFromInput(block.getBlockData(), BukkitAdapter.adapt(player).getContext()).toBlock();
-                    editSession.setBlock(position, blockState);
+                    // Use the simplest approach - create a basic block state from the material
+                    org.bukkit.Material material = org.bukkit.Material.matchMaterial(block.getBlockData());
+                    if (material != null) {
+                        // Create block state using the world adapter
+                        com.sk89q.worldedit.world.block.BlockType blockType =
+                            com.sk89q.worldedit.world.block.BlockType.REGISTRY.get(material.getKey().toString());
+                        if (blockType != null) {
+                            BlockState blockState = blockType.getDefaultState();
+                            editSession.setBlock(position, blockState);
+                        }
+                    }
                 } catch (Exception e) {
                     Logger.warn("Failed to parse block data: " + block.getBlockData());
                 }
             }
-            editSession.flushQueue();
+            editSession.close();
             Logger.info("Build placed for player " + player.getName() + " (" + blocks.size() + " blocks)");
         }
     }

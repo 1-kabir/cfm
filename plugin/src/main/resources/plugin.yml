@@ -1,4 +1,4 @@
-name: CursorMinecraft
+name: CFM
 version: 1.0.0
 main: com.cursorminecraft.CursorMinecraft
 api-version: '1.21'
@@ -6,12 +6,12 @@ author: Kabir
 depend: [WorldEdit]
 
 commands:
-  aibuild:
-    description: Main command for Cursor for Minecraft
+  cfm:
+    description: Main command for CFM (Cursor for Minecraft)
     usage: /<command> [help|create|tool|list|parse|jsonparse]
-    permission: aibuild.admin
+    permission: cfm.admin
 
 permissions:
-  aibuild.admin:
-    description: Allows administrative access to AI Build features
+  cfm.admin:
+    description: Allows administrative access to CFM features
     default: op

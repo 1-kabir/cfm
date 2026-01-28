@@ -1,5 +1,14 @@
+/**
+ * Cursor for Minecraft - Core Logic
+ * High-performance, modern AI chat interface
+ */
+
 let currentConversationId = null;
 let authHeader = null;
+let isTyping = false;
+
+// Initialize Lucide Icons
+const refreshIcons = () => lucide.createIcons();
 
 // Auth Check
 const storedAuth = localStorage.getItem('cursor_auth');
@@ -14,6 +23,8 @@ const appContainer = document.getElementById('app-container');
 const conversationList = document.getElementById('conversation-list');
 const chatMessages = document.getElementById('chat-messages');
 const promptInput = document.getElementById('prompt-input');
+const emptyState = document.getElementById('empty-state');
+const currentTitle = document.getElementById('current-title');
 
 // Event Listeners
 document.getElementById('login-btn').addEventListener('click', handleLogin);
@@ -21,10 +32,33 @@ document.getElementById('logout-btn').addEventListener('click', handleLogout);
 document.getElementById('send-btn').addEventListener('click', handleSendMessage);
 document.getElementById('new-chat-btn').addEventListener('click', () => resetChat());
 
+// Auto-resize textarea
+promptInput.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
+
+// Handle Enter to send
+promptInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+    }
+});
+
 async function handleLogin() {
     const user = document.getElementById('username').value;
     const pass = document.getElementById('password').value;
     const errorMsg = document.getElementById('login-error');
+    const loginBtn = document.getElementById('login-btn');
+
+    if (!user || !pass) {
+        errorMsg.innerText = "Please fill in all fields.";
+        return;
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.innerText = "Authenticating...";
 
     const header = 'Basic ' + btoa(`${user}:${pass}`);
 
@@ -38,10 +72,14 @@ async function handleLogin() {
             localStorage.setItem('cursor_auth', header);
             showApp();
         } else {
-            errorMsg.innerText = "Invalid credentials";
+            errorMsg.innerText = "Invalid credentials. Try again.";
+            loginBtn.disabled = false;
+            loginBtn.innerText = "Sign In";
         }
     } catch (e) {
-        errorMsg.innerText = "Connection failed";
+        errorMsg.innerText = "Could not connect to server.";
+        loginBtn.disabled = false;
+        loginBtn.innerText = "Sign In";
     }
 }
 
@@ -54,10 +92,10 @@ function showApp() {
     loginContainer.classList.add('hidden');
     appContainer.classList.remove('hidden');
     loadConversations();
+    refreshIcons();
 }
 
 async function loadConversations() {
-    // For now we use a placeholder UUID, in reality we might get it from server/auth
     const userUuid = "admin-uuid";
 
     try {
@@ -67,29 +105,40 @@ async function loadConversations() {
         const data = await res.json();
 
         conversationList.innerHTML = '';
-        data.forEach(conv => {
+        if (data.length === 0) {
+            conversationList.innerHTML = '<div class="p-4 text-center text-xs text-[#52525b]">No builds yet</div>';
+            return;
+        }
+
+        data.sort((a, b) => b.id - a.id).forEach(conv => {
             const item = document.createElement('div');
-            item.className = `conv-item ${currentConversationId === conv.id ? 'active' : ''}`;
-            item.innerHTML = `<i class="far fa-message"></i> <span>${conv.title}</span>`;
-            item.onclick = () => loadConversation(conv.id);
+            item.className = `conv-item w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-sm mb-1 border border-transparent ${currentConversationId === conv.id ? 'active' : 'hover:bg-[#18181b]'}`;
+            item.innerHTML = `
+                <div class="flex items-center gap-2 truncate">
+                    <i data-lucide="message-square" class="w-4 h-4 text-[#52525b]"></i>
+                    <span class="truncate font-medium">${conv.title}</span>
+                </div>
+            `;
+            item.onclick = () => loadConversation(conv.id, conv.title);
             conversationList.appendChild(item);
         });
+        refreshIcons();
     } catch (e) {
         console.error("Failed to load conversations", e);
     }
 }
 
-async function loadConversation(id) {
+async function loadConversation(id, title) {
     currentConversationId = id;
-    loadConversations(); // Refresh list to show active
+    currentTitle.innerText = title;
+    emptyState.classList.add('hidden');
+    loadConversations(); // Update active state
 
-    // Reset chat messages
     chatMessages.innerHTML = '';
 
     try {
-        // Load messages (TODO: implement message history in DB/API)
-        // For now just show "Conversation loaded"
-        addMessage('assistant', `Loaded conversation ${id}. You can continue describing your build.`);
+        // In a real app, you'd fetch message history here
+        addMessage('assistant', `Loaded build session: **${title}**. I'm ready to continue or modify this structure.`);
     } catch (e) {
         console.error("Failed to load conversation", e);
     }
@@ -97,15 +146,20 @@ async function loadConversation(id) {
 
 async function handleSendMessage() {
     const msg = promptInput.value.trim();
-    if (!msg) return;
+    if (!msg || isTyping) return;
+
+    if (emptyState) emptyState.classList.add('hidden');
 
     if (!currentConversationId) {
-        // Create new conversation first
+        currentTitle.innerText = msg.substring(0, 30);
         await createConversation(msg);
     }
 
     addMessage('user', msg);
     promptInput.value = '';
+    promptInput.style.height = 'auto';
+
+    showTypingIndicator();
 
     try {
         const res = await fetch(`/api/conversations/${currentConversationId}/messages`, {
@@ -118,9 +172,11 @@ async function handleSendMessage() {
         });
 
         const data = await res.json();
+        hideTypingIndicator();
         addMessage('assistant', data.response);
     } catch (e) {
-        addMessage('assistant', "Error: Failed to connect to AI.");
+        hideTypingIndicator();
+        addMessage('assistant', "Error: Connection lost. Ensure the plugin is still running.");
     }
 }
 
@@ -150,28 +206,58 @@ async function createConversation(title) {
 function addMessage(role, text) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${role}`;
+
+    const formattedText = marked.parse(text);
+
     msgDiv.innerHTML = `
+        <div class="avatar">${role === 'user' ? 'U' : 'C'}</div>
         <div class="message-content">
-            <div class="avatar">${role === 'user' ? 'U' : 'AI'}</div>
-            <div class="text">${text}</div>
+            <div class="message-bubble">
+                ${formattedText}
+            </div>
         </div>
     `;
+
     chatMessages.appendChild(msgDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function resetChat() {
-    currentConversationId = null;
-    chatMessages.innerHTML = `
-        <div class="welcome-screen">
-            <div class="logo-large">C</div>
-            <h1>What should we build today?</h1>
+function showTypingIndicator() {
+    isTyping = true;
+    const indicator = document.createElement('div');
+    indicator.id = 'typing-indicator-wrapper';
+    indicator.className = 'message assistant';
+    indicator.innerHTML = `
+        <div class="avatar">C</div>
+        <div class="message-content">
+            <div class="typing-indicator">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
         </div>
     `;
+    chatMessages.appendChild(indicator);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function hideTypingIndicator() {
+    isTyping = false;
+    const el = document.getElementById('typing-indicator-wrapper');
+    if (el) el.remove();
+}
+
+function resetChat() {
+    currentConversationId = null;
+    currentTitle.innerText = "New Build";
+    chatMessages.innerHTML = '';
+    emptyState.classList.remove('hidden');
     loadConversations();
 }
 
 function setPrompt(text) {
     promptInput.value = text;
     promptInput.focus();
+    promptInput.style.height = 'auto';
+    promptInput.style.height = (promptInput.scrollHeight) + 'px';
 }

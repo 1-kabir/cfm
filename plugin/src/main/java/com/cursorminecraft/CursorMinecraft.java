@@ -49,7 +49,7 @@ public class CursorMinecraft extends JavaPlugin {
         webServer = new WebServer();
         webServer.start();
 
-        getLogger().info("CursorMinecraft v" + getDescription().getVersion() + " has been enabled!");
+        getLogger().info("CFM v" + getDescription().getVersion() + " has been enabled!");
 
         // TODO: Register Listeners
     }

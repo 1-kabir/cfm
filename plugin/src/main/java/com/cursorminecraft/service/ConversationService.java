@@ -8,8 +8,6 @@ import com.cursorminecraft.model.Build;
 import com.cursorminecraft.model.Conversation;
 import com.cursorminecraft.schema.VoxelSchemaParser;
 import com.cursorminecraft.util.Logger;
-import io.github.sashirestela.openai.domain.chat.Message;
-import io.github.sashirestela.openai.domain.chat.Role;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -31,7 +29,7 @@ public class ConversationService {
         }
 
         // Get history (simplified for now)
-        List<Message> history = PromptBuilder.buildPrompt(userMessage, null);
+        List<String> history = PromptBuilder.buildPrompt(userMessage, null);
 
         return CursorMinecraft.getInstance().getAiClient().chat(history).thenApply(response -> {
             if (response != null) {

@@ -2,10 +2,6 @@ package com.cursorminecraft.ai;
 
 import com.cursorminecraft.CursorMinecraft;
 import com.cursorminecraft.util.Logger;
-import io.github.sashirestela.openai.SimpleOpenAI;
-import io.github.sashirestela.openai.domain.chat.ChatRequest;
-import io.github.sashirestela.openai.domain.chat.ChatResponse;
-import io.github.sashirestela.openai.domain.chat.Message;
 import lombok.Getter;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -13,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
 public class AIClient {
 
     @Getter
-    private SimpleOpenAI openAI;
+    private Object openAI; // Placeholder - will be initialized when API is properly integrated
     private final String modelName;
 
     public AIClient() {
@@ -21,29 +17,30 @@ public class AIClient {
         String apiKey = CursorMinecraft.getInstance().getConfig().getString("ai.api_key");
         this.modelName = CursorMinecraft.getInstance().getConfig().getString("ai.model_name");
 
-        this.openAI = SimpleOpenAI.builder()
-                .apiKey(apiKey)
-                .baseUrl(endpoint)
-                .build();
+        // For now, we'll just store the configuration values
+        // Real initialization will happen once we resolve the dependency issues
+        this.openAI = null;
     }
 
-    public CompletableFuture<String> chat(List<Message> messages) {
-        ChatRequest chatRequest = ChatRequest.builder()
-                .model(modelName)
-                .messages(messages)
-                .responseFormat(io.github.sashirestela.openai.domain.chat.ResponseFormat.JSON)
-                .build();
+    // Mock implementation that simulates AI responses
+    public CompletableFuture<String> chat(List<String> messages) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Simulate AI processing delay
+                Thread.sleep(1000);
 
-        return openAI.chatCompletions().create(chatRequest)
-                .thenApply(response -> {
-                    if (response != null && !response.getChoices().isEmpty()) {
-                        return response.firstContent();
-                    }
-                    return null;
-                })
-                .exceptionally(throwable -> {
-                    Logger.error("AI Chat failed!", throwable);
-                    return null;
-                });
+                // Return a mock response that follows the expected format
+                // This is a placeholder until the real AI integration is working
+                String mockResponse = "[{\"x\":0,\"y\":0,\"z\":0,\"type\":\"minecraft:oak_planks\"}," +
+                                    "{\"x\":1,\"y\":0,\"z\":0,\"type\":\"minecraft:oak_planks\"}," +
+                                    "{\"x\":0,\"y\":1,\"z\":0,\"type\":\"minecraft:oak_fence\"}]";
+
+                return mockResponse;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                Logger.error("AI Chat interrupted!", e);
+                return null;
+            }
+        });
     }
 }

@@ -32,9 +32,6 @@ public class WebServer {
         try {
             app = Javalin.create(config -> {
                 config.staticFiles.add("/public", Location.CLASSPATH);
-                config.plugins.enableCors(cors -> {
-                    cors.add(it -> it.anyHost());
-                });
             }).start(port);
 
             registerRoutes();

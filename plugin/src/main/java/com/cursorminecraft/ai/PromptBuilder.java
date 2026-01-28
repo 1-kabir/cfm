@@ -1,8 +1,6 @@
 package com.cursorminecraft.ai;
 
 import com.cursorminecraft.util.Logger;
-import io.github.sashirestela.openai.domain.chat.Message;
-import io.github.sashirestela.openai.domain.chat.Role;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,15 +15,15 @@ public class PromptBuilder {
             "Support directional blocks using states in brackets, e.g., 'minecraft:oak_stairs[facing=north]'. " +
             "Be creative, sophisticated, and structurally sound.";
 
-    public static List<Message> buildPrompt(String userPrompt, String context) {
-        List<Message> messages = new ArrayList<>();
-        messages.add(Message.of(Role.SYSTEM, SYSTEM_PROMPT));
+    public static List<String> buildPrompt(String userPrompt, String context) {
+        List<String> messages = new ArrayList<>();
+        messages.add(SYSTEM_PROMPT);
 
         if (context != null && !context.isEmpty()) {
-            messages.add(Message.of(Role.ASSISTANT, "Existing build context: " + context));
+            messages.add("Existing build context: " + context);
         }
 
-        messages.add(Message.of(Role.USER, userPrompt));
+        messages.add(userPrompt);
         return messages;
     }
 }

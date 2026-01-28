@@ -7,7 +7,7 @@ import org.bukkit.Bukkit;
 
 public class Logger {
 
-    private static final String PREFIX = "[CursorAI] ";
+    private static final String PREFIX = "[CFM] ";
 
     public static void info(String message) {
         CursorMinecraft.getInstance().getLogger().info(message);

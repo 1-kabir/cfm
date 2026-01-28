@@ -17,9 +17,9 @@ public class WorldEditToVoxelParser {
         BlockVector3 min = region.getMinimumPoint();
         List<VoxelSchemaParser.VoxelBlock> blocks = new ArrayList<>();
 
-        for (int x = region.getMinimumPoint().getX(); x <= region.getMaximumPoint().getX(); x++) {
-            for (int y = region.getMinimumPoint().getY(); y <= region.getMaximumPoint().getY(); y++) {
-                for (int z = region.getMinimumPoint().getZ(); z <= region.getMaximumPoint().getZ(); z++) {
+        for (int x = region.getMinimumPoint().getBlockX(); x <= region.getMaximumPoint().getBlockX(); x++) {
+            for (int y = region.getMinimumPoint().getBlockY(); y <= region.getMaximumPoint().getBlockY(); y++) {
+                for (int z = region.getMinimumPoint().getBlockZ(); z <= region.getMaximumPoint().getBlockZ(); z++) {
                     Block block = world.getBlockAt(x, y, z);
                     if (!block.getType().isAir()) {
                         String blockData = block.getBlockData().getAsString();
@@ -32,9 +32,9 @@ public class WorldEditToVoxelParser {
                         }
 
                         blocks.add(new VoxelSchemaParser.VoxelBlock(
-                                x - min.getX(),
-                                y - min.getY(),
-                                z - min.getZ(),
+                                x - min.getBlockX(),
+                                y - min.getBlockY(),
+                                z - min.getBlockZ(),
                                 type));
                     }
                 }

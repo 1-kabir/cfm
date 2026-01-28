@@ -3,7 +3,7 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-group = 'com.cursorminecraft'
+group = 'com.cfm'
 version = '1.0.0'
 
 repositories {
@@ -52,7 +52,9 @@ tasks.withType(JavaCompile) {
 }
 
 shadowJar {
+    archiveBaseName.set('CFM')
     archiveClassifier.set('')
+    archiveVersion.set('1.0.0')
 }
 
 build.dependsOn shadowJar

@@ -1,91 +1,178 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cursor AI | Minecraft Generator</title>
+    <title>Cursor AI | Minecraft</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="dark-theme">
-    <div id="login-container" class="auth-screen">
-        <div class="login-card">
-            <h1>Cursor for Minecraft</h1>
-            <p>Enter your credentials to access the AI control panel.</p>
-            <input type="text" id="username" placeholder="Username">
-            <input type="password" id="password" placeholder="Password">
-            <button id="login-btn">Login</button>
-            <p id="login-error" class="error-msg"></p>
+
+<body class="bg-[#09090b] text-[#fafafa] font-['Inter'] antialiased overflow-hidden">
+    <!-- Auth Overlay -->
+    <div id="login-container" class="fixed inset-0 z-50 flex items-center justify-center bg-[#09090b]">
+        <div class="w-full max-w-sm p-8 bg-[#18181b] rounded-2xl border border-[#27272a] shadow-2xl space-y-6">
+            <div class="space-y-2 text-center">
+                <div
+                    class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white text-black font-bold text-2xl mb-2">
+                    C</div>
+                <h1 class="text-2xl font-bold tracking-tight">Welcome back</h1>
+                <p class="text-sm text-[#a1a1aa]">Cursor for Minecraft AI Control Panel</p>
+            </div>
+            <div class="space-y-4">
+                <div class="space-y-2">
+                    <input type="text" id="username" placeholder="Username"
+                        class="w-full px-4 py-2 bg-[#09090b] border border-[#27272a] rounded-lg focus:outline-none focus:ring-2 focus:ring-white/10 transition-all placeholder:text-[#52525b]">
+                </div>
+                <div class="space-y-2">
+                    <input type="password" id="password" placeholder="Password"
+                        class="w-full px-4 py-2 bg-[#09090b] border border-[#27272a] rounded-lg focus:outline-none focus:ring-2 focus:ring-white/10 transition-all placeholder:text-[#52525b]">
+                </div>
+                <button id="login-btn"
+                    class="w-full py-2 bg-white text-black font-semibold rounded-lg hover:bg-[#e4e4e7] active:scale-[0.98] transition-all">Sign
+                    In</button>
+            </div>
+            <p id="login-error" class="text-xs text-red-500 text-center"></p>
         </div>
     </div>
 
-    <div id="app-container" class="app-layout hidden">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <button id="new-chat-btn"><i class="fas fa-plus"></i> New Build</button>
+    <!-- Main Layout -->
+    <div id="app-container" class="flex h-screen w-full hidden">
+        <!-- Sidebar -->
+        <aside class="w-[280px] flex-shrink-0 bg-[#09090b] border-r border-[#18181b] flex flex-col">
+            <div class="p-4 border-b border-[#18181b]">
+                <button id="new-chat-btn"
+                    class="w-full flex items-center justify-between px-4 py-2.5 bg-[#18181b] border border-[#27272a] rounded-lg hover:bg-[#27272a] transition-all text-sm group">
+                    <span class="font-medium">New Build</span>
+                    <i data-lucide="plus" class="w-4 h-4 text-[#a1a1aa] group-hover:text-white transition-colors"></i>
+                </button>
             </div>
-            <div id="conversation-list" class="conversation-list">
-                <!-- Conversations will be loaded here -->
+
+            <div id="conversation-list" class="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                <!-- Conversations load here -->
             </div>
-            <div class="sidebar-footer">
-                <div class="user-info">
-                    <i class="fas fa-user-circle"></i>
-                    <span id="display-name">Admin</span>
+
+            <div class="p-4 border-t border-[#18181b] bg-[#09090b]/80 backdrop-blur-md">
+                <div class="flex items-center justify-between p-2 rounded-lg bg-[#18181b] border border-[#27272a]">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-8 h-8 rounded-full bg-gradient-to-tr from-[#3b82f6] to-[#8b5cf6] flex items-center justify-center text-xs font-bold">
+                            A</div>
+                        <div class="flex flex-col">
+                            <span class="text-sm font-medium" id="display-name">Admin</span>
+                            <span class="text-[10px] text-[#a1a1aa]">Connected</span>
+                        </div>
+                    </div>
+                    <button id="logout-btn" class="p-1.5 text-[#52525b] hover:text-white transition-colors">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
                 </div>
-                <button id="logout-btn"><i class="fas fa-sign-out-alt"></i></button>
             </div>
         </aside>
 
-        <main class="main-content">
-            <header class="top-bar">
-                <div class="build-info">
-                    <h2 id="current-title">New Build</h2>
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col relative bg-[#09090b]">
+            <!-- Top Navbar -->
+            <header
+                class="h-14 flex items-center justify-between px-6 border-b border-[#18181b] bg-[#09090b]/50 backdrop-blur-xl sticky top-0 z-10">
+                <div class="flex items-center gap-4">
+                    <span
+                        class="text-xs font-medium px-2 py-0.5 rounded bg-[#18181b] border border-[#27272a] text-[#a1a1aa]">v1.0.0</span>
+                    <h2 id="current-title" class="text-sm font-medium truncate max-w-[300px]">New Conversation</h2>
                 </div>
-                <div class="actions">
-                    <button id="theme-toggle"><i class="fas fa-moon"></i></button>
-                    <button id="settings-btn"><i class="fas fa-cog"></i></button>
+                <div class="flex items-center gap-3">
+                    <button class="p-2 text-[#a1a1aa] hover:text-white transition-colors" id="theme-toggle">
+                        <i data-lucide="sun" class="w-4 h-4"></i>
+                    </button>
+                    <button class="p-2 text-[#a1a1aa] hover:text-white transition-colors" id="settings-btn">
+                        <i data-lucide="settings" class="w-4 h-4"></i>
+                    </button>
                 </div>
             </header>
 
-            <div id="chat-messages" class="chat-area">
-                <div class="welcome-screen">
-                    <div class="logo-large">C</div>
-                    <h1>What should we build today?</h1>
-                    <div class="suggestions">
-                        <div class="suggestion-card" onclick="setPrompt('Build a gothic cathedral')">
-                            <i class="fas fa-church"></i>
-                            <span>Gothic Cathedral</span>
+            <!-- Chat Grid -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-8 space-y-8 custom-scrollbar relative">
+                <div id="empty-state"
+                    class="flex flex-col items-center justify-center h-full max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div
+                        class="w-16 h-16 rounded-2xl bg-white text-black flex items-center justify-center text-4xl font-black shadow-2xl">
+                        C</div>
+                    <h1 class="text-3xl font-bold tracking-tight text-center">What should we build?</h1>
+
+                    <div class="grid grid-cols-2 gap-3 w-full">
+                        <div class="suggestion-card p-4 bg-[#18181b] border border-[#27272a] rounded-xl hover:bg-[#27272a] cursor-pointer transition-all group"
+                            onclick="setPrompt('Generate a modern minimalist villa')">
+                            <i data-lucide="home" class="w-5 h-5 mb-2 text-[#3b82f6]"></i>
+                            <p class="text-sm font-medium">Modern Villa</p>
+                            <p class="text-xs text-[#71717a]">Clean lines and glass walls</p>
                         </div>
-                        <div class="suggestion-card" onclick="setPrompt('Build a modern skyscraper')">
-                            <i class="fas fa-building"></i>
-                            <span>Modern Skyscraper</span>
+                        <div class="suggestion-card p-4 bg-[#18181b] border border-[#27272a] rounded-xl hover:bg-[#27272a] cursor-pointer transition-all group"
+                            onclick="setPrompt('Build a medieval fortification')">
+                            <i data-lucide="shield" class="w-5 h-5 mb-2 text-[#ef4444]"></i>
+                            <p class="text-sm font-medium">Medieval Fortress</p>
+                            <p class="text-xs text-[#71717a]">Stone walls and wooden towers</p>
                         </div>
-                        <div class="suggestion-card" onclick="setPrompt('Build a small wooden cottage')">
-                            <i class="fas fa-home"></i>
-                            <span>Wooden Cottage</span>
+                        <div class="suggestion-card p-4 bg-[#18181b] border border-[#27272a] rounded-xl hover:bg-[#27272a] cursor-pointer transition-all group"
+                            onclick="setPrompt('Create an oriental pagoda')">
+                            <i data-lucide="temple" class="w-5 h-5 mb-2 text-[#f59e0b]"></i>
+                            <p class="text-sm font-medium">Oriental Pagoda</p>
+                            <p class="text-xs text-[#71717a]">Traditional tiered roofing</p>
+                        </div>
+                        <div class="suggestion-card p-4 bg-[#18181b] border border-[#27272a] rounded-xl hover:bg-[#27272a] cursor-pointer transition-all group"
+                            onclick="setPrompt('Construct a futuristic space station')">
+                            <i data-lucide="rocket" class="w-5 h-5 mb-2 text-[#8b5cf6]"></i>
+                            <p class="text-sm font-medium">Space Station</p>
+                            <p class="text-xs text-[#71717a]">Glass, glowstone and iron</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <footer class="input-area">
-                <div class="input-container">
-                    <textarea id="prompt-input" placeholder="Describe your structure..."></textarea>
-                    <div class="input-controls">
-                        <button id="attach-btn"><i class="fas fa-paperclip"></i></button>
-                        <select id="build-mode">
-                            <option value="fast">Fast Mode</option>
-                            <option value="pro">Pro Mode (Thinking)</option>
-                        </select>
-                        <button id="send-btn"><i class="fas fa-arrow-up"></i></button>
+            <!-- Bottom Input Section -->
+            <div class="max-w-4xl w-full mx-auto p-4 pb-8 space-y-4">
+                <div
+                    class="relative bg-[#18181b] border border-[#27272a] rounded-2xl shadow-2xl focus-within:ring-2 focus-within:ring-white/5 transition-all">
+                    <textarea id="prompt-input" placeholder="Describe your structure in detail..."
+                        class="w-full bg-transparent px-5 pt-4 pb-12 rounded-2xl border-none focus:ring-0 text-[15px] resize-none min-h-[60px] max-h-[200px] text-[#fafafa] placeholder:text-[#52525b] custom-scrollbar"></textarea>
+
+                    <div class="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+                        <div class="flex items-center gap-1">
+                            <button id="attach-btn"
+                                class="p-2 text-[#52525b] hover:text-[#a1a1aa] hover:bg-[#27272a] rounded-lg transition-all">
+                                <i data-lucide="paperclip" class="w-4 h-4"></i>
+                            </button>
+                            <div class="h-4 w-[1px] bg-[#27272a] mx-1"></div>
+                            <select id="build-mode"
+                                class="bg-transparent text-[11px] font-medium text-[#71717a] py-1.5 px-2 hover:bg-[#27272a] rounded-md border-none focus:ring-0 transition-all">
+                                <option value="fast" class="bg-[#09090b]">Fast Generation</option>
+                                <option value="pro" class="bg-[#09090b]">Pro (Reasoning)</option>
+                            </select>
+                        </div>
+
+                        <button id="send-btn"
+                            class="flex items-center justify-center w-8 h-8 rounded-lg bg-[#fafafa] text-black disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#e4e4e7] active:scale-95 transition-all">
+                            <i data-lucide="arrow-up" class="w-4 h-4 stroke-[3]"></i>
+                        </button>
                     </div>
                 </div>
-                <p class="disclaimer">Cursor AI may generate incorrect block placements. Verify with `/aibuild preview`.</p>
-            </footer>
+                <p class="text-[10px] text-center text-[#52525b] uppercase tracking-widest font-bold">
+                    Cursor for Minecraft AI Engine • Verified placements recommended
+                </p>
+            </div>
         </main>
     </div>
 
     <script src="app.js"></script>
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+    </script>
 </body>
+
 </html>
