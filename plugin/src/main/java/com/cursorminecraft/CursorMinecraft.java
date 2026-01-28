@@ -64,7 +64,7 @@ public class CursorMinecraft extends JavaPlugin {
             databaseManager.close();
         }
 
-        getLogger().info("CursorMinecraft has been disabled!");
+        getLogger().info("CFM has been disabled!");
     }
 
     public static CursorMinecraft getInstance() {
