@@ -10,9 +10,14 @@ import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BlockState;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class BlockPlacementEngine {
+
+    private static final Random RANDOM = new Random();
 
     public static void placeBuild(Player player, List<VoxelSchemaParser.BuildOperation> operations,
             BlockVector3 origin) {
@@ -20,6 +25,10 @@ public class BlockPlacementEngine {
         com.sk89q.worldedit.world.World weWorld = BukkitAdapter.adapt(world);
 
         try (EditSession editSession = WorldEdit.getInstance().newEditSession(weWorld)) {
+            // Disable fast mode to ensure block updates/physics (helps with fences, panes,
+            // doors)
+            editSession.setFastMode(false);
+
             for (VoxelSchemaParser.BuildOperation op : operations) {
                 handleOperation(player, editSession, op, origin);
             }
@@ -33,14 +42,16 @@ public class BlockPlacementEngine {
     private static void handleOperation(Player player, EditSession editSession, VoxelSchemaParser.BuildOperation op,
             BlockVector3 origin) throws MaxChangedBlocksException {
         String pattern = op.getPattern() != null ? op.getPattern().toLowerCase() : "single";
-        BlockState blockState = parseBlock(op.getBlockData());
-        if (blockState == null)
+
+        // Handle potential palette
+        WeightedPalette palette = new WeightedPalette(op.getBlockData());
+        if (palette.isEmpty())
             return;
 
         int x1 = op.getX1(), y1 = op.getY1(), z1 = op.getZ1();
 
         if (pattern.equals("single")) {
-            editSession.setBlock(origin.add(x1, y1, z1), blockState);
+            editSession.setBlock(origin.add(x1, y1, z1), palette.getRandomState());
         } else if (op.getX2() != null && op.getY2() != null && op.getZ2() != null) {
             int x2 = op.getX2(), y2 = op.getY2(), z2 = op.getZ2();
 
@@ -61,15 +72,13 @@ public class BlockPlacementEngine {
                         };
 
                         if (shouldPlace) {
-                            editSession.setBlock(origin.add(x, y, z), blockState);
+                            editSession.setBlock(origin.add(x, y, z), palette.getRandomState());
                         }
                     }
                 }
             }
-        } else if (pattern.equals("door")) {
-            editSession.setBlock(origin.add(x1, y1, z1), blockState);
-        } else if (pattern.equals("layer")) {
-            editSession.setBlock(origin.add(x1, y1, z1), blockState);
+        } else if (pattern.equals("door") || pattern.equals("layer")) {
+            editSession.setBlock(origin.add(x1, y1, z1), palette.getRandomState());
         }
     }
 
@@ -84,10 +93,17 @@ public class BlockPlacementEngine {
     }
 
     private static BlockState parseBlock(String blockData) {
+        if (blockData == null || blockData.isEmpty())
+            return null;
         try {
             return WorldEdit.getInstance().getBlockFactory().parseFromInput(blockData, null).toImmutableState();
         } catch (Exception e) {
-            org.bukkit.Material material = org.bukkit.Material.matchMaterial(blockData);
+            // Simplified fallback
+            String materialName = blockData.contains("[") ? blockData.substring(0, blockData.indexOf("[")) : blockData;
+            if (materialName.startsWith("minecraft:"))
+                materialName = materialName.substring(10);
+
+            org.bukkit.Material material = org.bukkit.Material.matchMaterial(materialName);
             if (material != null) {
                 com.sk89q.worldedit.world.block.BlockType blockType = com.sk89q.worldedit.world.block.BlockType.REGISTRY
                         .get(material.getKey().toString());
@@ -96,5 +112,59 @@ public class BlockPlacementEngine {
             }
         }
         return null;
+    }
+
+    private static class WeightedPalette {
+        private final List<BlockState> states = new ArrayList<>();
+        private final List<Double> cumulativeWeights = new ArrayList<>();
+        private double totalWeight = 0;
+
+        public WeightedPalette(String input) {
+            if (input == null || input.isEmpty())
+                return;
+
+            String[] parts = input.split(",");
+            for (String part : parts) {
+                part = part.trim();
+                double weight = 1.0;
+                String blockData = part;
+
+                if (part.contains("%")) {
+                    try {
+                        int percentIdx = part.indexOf("%");
+                        weight = Double.parseDouble(part.substring(0, percentIdx));
+                        blockData = part.substring(percentIdx + 1);
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                }
+
+                BlockState state = parseBlock(blockData);
+                if (state != null) {
+                    states.add(state);
+                    totalWeight += weight;
+                    cumulativeWeights.add(totalWeight);
+                }
+            }
+        }
+
+        public boolean isEmpty() {
+            return states.isEmpty();
+        }
+
+        public BlockState getRandomState() {
+            if (isEmpty())
+                return null;
+            if (states.size() == 1)
+                return states.get(0);
+
+            double r = RANDOM.nextDouble() * totalWeight;
+            for (int i = 0; i < cumulativeWeights.size(); i++) {
+                if (r <= cumulativeWeights.get(i)) {
+                    return states.get(i);
+                }
+            }
+            return states.get(0);
+        }
     }
 }

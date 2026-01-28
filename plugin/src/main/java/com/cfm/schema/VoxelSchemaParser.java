@@ -53,7 +53,7 @@ public class VoxelSchemaParser {
     public static class BuildMetadata {
         private final String name;
         private final String description;
-        private final String workflow; // default, filling, simplePatterns
+        private final String workflow; // default, filling, patterns
         private final RegionBounds region;
     }
 
