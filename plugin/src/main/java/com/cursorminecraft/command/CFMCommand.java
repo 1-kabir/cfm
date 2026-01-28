@@ -20,14 +20,23 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class CFMCommand implements CommandExecutor, TabCompleter {
 
     private final ConversationService conversationService = new ConversationService();
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label,
@@ -96,12 +105,13 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
             }
 
             try {
-                List<VoxelSchemaParser.VoxelBlock> blocks = VoxelSchemaParser.parseSchema(response);
-                if (blocks.isEmpty()) {
+                VoxelSchemaParser.BuildSchema schema = VoxelSchemaParser.parseFullSchema(response);
+                if (schema.getBlocks().isEmpty()) {
                     player.sendMessage("§8[§dAI§8] §f" + response);
                 } else {
-                    BlockPlacementEngine.placeBuild(player, blocks, origin);
-                    player.sendMessage("§8[§bCFM§8] §aBuild complete! §7(" + blocks.size() + " blocks placed)");
+                    BlockPlacementEngine.placeBuild(player, schema.getBlocks(), origin);
+                    player.sendMessage(
+                            "§8[§bCFM§8] §aBuild complete! §7(" + schema.getBlocks().size() + " blocks placed)");
                 }
             } catch (Exception e) {
                 player.sendMessage("§8[§dAI§8] §f" + response);
@@ -118,15 +128,72 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
         Region region = WorldEditSelectionHelper.getPlayerSelection(player);
         try {
             String json = WorldEditToVoxelParser.convertRegionToJson(player.getWorld(), region);
-            Logger.info("Selection JSON: " + json);
-            player.sendMessage("§8[§bCFM§8] §aSelection parsed! §7JSON outputted to console.");
+            Logger.info("Parsed Build JSON:\n" + json);
+            player.sendMessage("§8[§bCFM§8] §aSelection parsed! §7JSON with bounds outputted to console.");
         } catch (Exception e) {
             player.sendMessage("§8[§bCFM§8] §cError: " + e.getMessage());
         }
     }
 
     private void handleJsonParse(Player player, String[] args) {
-        player.sendMessage("§8[§bCFM§8] §eComing soon via Web Interface!");
+        if (args.length < 2) {
+            player.sendMessage("§8[§bCFM§8] §cUsage: §f/cfm jsonparse <url>");
+            return;
+        }
+
+        String url = args[1];
+        player.sendMessage("§8[§bCFM§8] §eFetching JSON from remote source...");
+
+        fetchJson(url).thenAccept(json -> {
+            if (json == null) {
+                player.sendMessage("§8[§bCFM§8] §cFailed to fetch or read from URL.");
+                return;
+            }
+
+            try {
+                VoxelSchemaParser.BuildSchema schema = VoxelSchemaParser.parseFullSchema(json);
+                if (schema.getBlocks().isEmpty()) {
+                    player.sendMessage("§8[§bCFM§8] §cThe JSON provided contains no valid block data.");
+                    return;
+                }
+
+                String name = schema.getMetadata() != null ? schema.getMetadata().getName() : "Remote Build";
+                player.sendMessage("§8[§bCFM§8] §aManifesting §f" + name + " §7at your location...");
+
+                // Place at player location as origin
+                BlockVector3 origin = BlockVector3.at(
+                        player.getLocation().getBlockX(),
+                        player.getLocation().getBlockY(),
+                        player.getLocation().getBlockZ());
+
+                BlockPlacementEngine.placeBuild(player, schema.getBlocks(), origin);
+                player.sendMessage(
+                        "§8[§bCFM§8] §aConstruction finalized! §7(" + schema.getBlocks().size() + " blocks placed)");
+
+            } catch (Exception e) {
+                player.sendMessage("§8[§bCFM§8] §cError parsing schema: §7" + e.getMessage());
+                Logger.error("Schema parse error", e);
+            }
+        });
+    }
+
+    private CompletableFuture<String> fetchJson(String url) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .GET()
+                        .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 200) {
+                    return response.body();
+                }
+            } catch (Exception e) {
+                Logger.error("Failed to fetch JSON from " + url, e);
+            }
+            return null;
+        });
     }
 
     private void handleList(Player player) {
@@ -157,7 +224,8 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(" ");
         player.sendMessage("§b/cfm tool §8- §7Get selection wand");
         player.sendMessage("§b/cfm create <prompt> §8- §7Generate build");
-        player.sendMessage("§b/cfm parse §8- §7Selection to JSON");
+        player.sendMessage("§b/cfm parse §8- §7Selection to JSON (w/ Bounds)");
+        player.sendMessage("§b/cfm jsonparse <url> §8- §7Build from URL");
         player.sendMessage("§b/cfm list §8- §7View your chats");
         player.sendMessage("§b/cfm reload §8- §7Reload plugin");
     }
