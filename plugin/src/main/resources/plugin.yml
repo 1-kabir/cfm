@@ -1,6 +1,6 @@
 name: CFM
 version: 1.0.0
-main: com.cursorminecraft.CursorMinecraft
+main: com.cfm.CFM
 api-version: '1.21'
 author: Kabir
 depend: [WorldEdit]

@@ -1,11 +1,12 @@
-package com.cursorminecraft.database.dao;
+package com.cfm.database.dao;
 
-import com.cursorminecraft.database.DatabaseManager;
-import com.cursorminecraft.model.Conversation;
-import com.cursorminecraft.util.Logger;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.cfm.database.DatabaseManager;
+import com.cfm.model.Conversation;
+import com.cfm.util.Logger;
 
 public class ConversationDAO {
 

@@ -22,7 +22,7 @@ An AI-powered building engine that brings "Cursor-style" agentic building to the
 - Web interface accessible at `http://[server-ip]:[port]` for build management
 - Conversation history and build iteration tracking via SQLite database
 - Shows particle effects for region selections
-- All ingame commands will be locked behind `aibuild.admin` permission
+- All ingame commands will be locked behind `cfm.admin` permission
 
 ## Testing Workflows
 
@@ -32,18 +32,18 @@ An AI-powered building engine that brings "Cursor-style" agentic building to the
 
 ## In-Game Commands
 
-- /aibuild - Opens a help menu
-- /aibuild help - Opens a help menu
-- /aibuild tool - Gives the user a golden axe with which the user can set an area selection to generate the build in
-- /aibuild create - Starts a build setup wizard which will guide the user through the process of setting up & creating a build
-- /aibuild resume <buildID> - Lets the user resume a build creation wizard
-- /aibuild schemagen <buildID> - Generates a .schema file for the latest iteration of the build
-- /aibuild list - Lists all the builds that the user has created
-- /aibuild workflow <workflowName> - Lets the user set a workflow for the build
-- /aibuild parse - Takes the current selection and parses it into JSON
-- /aibuild jsonparse <fileURL/path> - Takes a JSON file and parses it into a build
+- /cfm - Opens a help menu
+- /cfm help - Opens a help menu
+- /cfm tool - Gives the user a golden axe with which the user can set an area selection to generate the build in
+- /cfm create - Starts a build setup wizard which will guide the user through the process of setting up & creating a build
+- /cfm resume <buildID> - Lets the user resume a build creation wizard
+- /cfm schemagen <buildID> - Generates a .schema file for the latest iteration of the build
+- /cfm list - Lists all the builds that the user has created
+- /cfm workflow <workflowName> - Lets the user set a workflow for the build
+- /cfm parse - Takes the current selection and parses it into JSON
+- /cfm jsonparse <fileURL/path> - Takes a JSON file and parses it into a build
 
-### /aibuild create Workflow
+### /cfm create Workflow
 
 1. The user inputs a build prompt in NLP and/or an image/video URL of a build they wish to replicate
 2. [OPTIONAL] The image/video is derived into text by Gemini and explained thoroughly

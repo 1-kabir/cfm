@@ -1,13 +1,14 @@
-package com.cursorminecraft.command;
+package com.cfm.command;
 
-import com.cursorminecraft.CursorMinecraft;
 import org.bukkit.command.PluginCommand;
+
+import com.cfm.CFM;
 
 public class CommandManager {
 
     public void registerCommands() {
         CFMCommand executor = new CFMCommand();
-        PluginCommand command = CursorMinecraft.getInstance().getCommand("cfm");
+        PluginCommand command = CFM.getInstance().getCommand("cfm");
 
         if (command != null) {
             command.setExecutor(executor);

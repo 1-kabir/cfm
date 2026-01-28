@@ -1,9 +1,10 @@
-package com.cursorminecraft.web;
+package com.cfm.web;
 
-import com.cursorminecraft.CursorMinecraft;
-import com.cursorminecraft.model.Conversation;
-import com.cursorminecraft.service.ConversationService;
-import com.cursorminecraft.util.Logger;
+import com.cfm.CFM;
+import com.cfm.model.Conversation;
+import com.cfm.service.ConversationService;
+import com.cfm.util.Logger;
+
 import io.javalin.Javalin;
 import io.javalin.http.staticfiles.Location;
 import lombok.Getter;
@@ -16,12 +17,12 @@ public class WebServer {
     private final ConversationService conversationService;
 
     public WebServer() {
-        this.port = CursorMinecraft.getInstance().getConfig().getInt("web_interface.port", 8080);
+        this.port = CFM.getInstance().getConfig().getInt("web_interface.port", 8080);
         this.conversationService = new ConversationService();
     }
 
     public void start() {
-        if (!CursorMinecraft.getInstance().getConfig().getBoolean("web_interface.enabled", true)) {
+        if (!CFM.getInstance().getConfig().getBoolean("web_interface.enabled", true)) {
             Logger.info("Web interface is disabled in config.");
             return;
         }
@@ -57,17 +58,17 @@ public class WebServer {
                 ctx.status(400).result("Missing user_uuid");
                 return;
             }
-            ctx.json(CursorMinecraft.getInstance().getConversationDAO().getConversationsByUser(userUuid));
+            ctx.json(CFM.getInstance().getConversationDAO().getConversationsByUser(userUuid));
         });
 
         app.get("/api/conversations/{id}", ctx -> {
             int id = Integer.parseInt(ctx.pathParam("id"));
-            ctx.json(CursorMinecraft.getInstance().getConversationDAO().getConversation(id));
+            ctx.json(CFM.getInstance().getConversationDAO().getConversation(id));
         });
 
         app.post("/api/conversations", ctx -> {
             Conversation conv = ctx.bodyAsClass(Conversation.class);
-            int id = CursorMinecraft.getInstance().getConversationDAO().createConversation(conv);
+            int id = CFM.getInstance().getConversationDAO().createConversation(conv);
             ctx.status(201).json("{\"id\": " + id + "}");
         });
 
@@ -86,12 +87,12 @@ public class WebServer {
                 return;
             }
             int convId = Integer.parseInt(convIdStr);
-            ctx.json(CursorMinecraft.getInstance().getBuildDAO().getBuildsByConversation(convId));
+            ctx.json(CFM.getInstance().getBuildDAO().getBuildsByConversation(convId));
         });
 
         app.get("/api/builds/{id}", ctx -> {
             int id = Integer.parseInt(ctx.pathParam("id"));
-            ctx.json(CursorMinecraft.getInstance().getBuildDAO().getBuild(id));
+            ctx.json(CFM.getInstance().getBuildDAO().getBuild(id));
         });
     }
 

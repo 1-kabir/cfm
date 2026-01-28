@@ -1,12 +1,13 @@
-package com.cursorminecraft.database;
+package com.cfm.database;
 
-import com.cursorminecraft.CursorMinecraft;
-import com.cursorminecraft.util.Logger;
 import java.io.File;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+
+import com.cfm.CFM;
+import com.cfm.util.Logger;
 
 public class DatabaseManager {
 
@@ -14,12 +15,12 @@ public class DatabaseManager {
     private final String dbFile;
 
     public DatabaseManager() {
-        this.dbFile = CursorMinecraft.getInstance().getConfig().getString("database.sqlite.file", "data.db");
+        this.dbFile = CFM.getInstance().getConfig().getString("database.sqlite.file", "data.db");
     }
 
     public void initialize() {
         try {
-            File dataFolder = CursorMinecraft.getInstance().getDataFolder();
+            File dataFolder = CFM.getInstance().getDataFolder();
             if (!dataFolder.exists()) {
                 dataFolder.mkdirs();
             }

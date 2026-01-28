@@ -1,4 +1,4 @@
-package com.cursorminecraft.model;
+package com.cfm.model;
 
 import lombok.Builder;
 import lombok.Data;

@@ -1,13 +1,13 @@
-package com.cursorminecraft.command;
+package com.cfm.command;
 
-import com.cursorminecraft.CursorMinecraft;
-import com.cursorminecraft.model.Conversation;
-import com.cursorminecraft.schema.VoxelSchemaParser;
-import com.cursorminecraft.schema.WorldEditToVoxelParser;
-import com.cursorminecraft.service.ConversationService;
-import com.cursorminecraft.util.Logger;
-import com.cursorminecraft.worldedit.BlockPlacementEngine;
-import com.cursorminecraft.worldedit.WorldEditSelectionHelper;
+import com.cfm.CFM;
+import com.cfm.model.Conversation;
+import com.cfm.schema.VoxelSchemaParser;
+import com.cfm.schema.WorldEditToVoxelParser;
+import com.cfm.service.ConversationService;
+import com.cfm.util.Logger;
+import com.cfm.worldedit.BlockPlacementEngine;
+import com.cfm.worldedit.WorldEditSelectionHelper;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.regions.Region;
 import org.bukkit.Material;
@@ -96,7 +96,7 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
                 .status(Conversation.ConversationStatus.ACTIVE)
                 .build();
 
-        int convId = CursorMinecraft.getInstance().getConversationDAO().createConversation(conv);
+        int convId = CFM.getInstance().getConversationDAO().createConversation(conv);
 
         conversationService.sendMessage(convId, prompt).thenAccept(response -> {
             if (response == null) {
@@ -197,7 +197,7 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
     }
 
     private void handleList(Player player) {
-        List<Conversation> conversations = CursorMinecraft.getInstance().getConversationDAO()
+        List<Conversation> conversations = CFM.getInstance().getConversationDAO()
                 .getConversationsByUser(player.getUniqueId().toString());
         if (conversations.isEmpty()) {
             player.sendMessage("§8[§bCFM§8] §7No active conversations found.");
@@ -215,7 +215,7 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
             return;
         }
         player.sendMessage("§8[§bCFM§8] §eReloading configuration...");
-        CursorMinecraft.getInstance().reloadPlugin();
+        CFM.getInstance().reloadPlugin();
         player.sendMessage("§8[§bCFM§8] §aReload complete!");
     }
 

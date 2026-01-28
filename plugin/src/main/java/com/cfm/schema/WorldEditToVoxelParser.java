@@ -1,4 +1,4 @@
-package com.cursorminecraft.schema;
+package com.cfm.schema;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -19,7 +19,7 @@ public class WorldEditToVoxelParser {
         BlockVector3 min = region.getMinimumPoint();
         BlockVector3 max = region.getMaximumPoint();
 
-        List<VoxelSchemaParser.VoxelBlock> blocks = new ArrayList<>();
+        List<VoxelSchemaParser.BuildOperation> blocks = new ArrayList<>();
 
         for (int x = min.getBlockX(); x <= max.getBlockX(); x++) {
             for (int y = min.getBlockY(); y <= max.getBlockY(); y++) {
@@ -35,11 +35,13 @@ public class WorldEditToVoxelParser {
                             type = block.getType().getKey().toString();
                         }
 
-                        blocks.add(new VoxelSchemaParser.VoxelBlock(
-                                x - min.getBlockX(),
-                                y - min.getBlockY(),
-                                z - min.getBlockZ(),
-                                type));
+                        blocks.add(VoxelSchemaParser.BuildOperation.builder()
+                                .x1(x - min.getBlockX())
+                                .y1(y - min.getBlockY())
+                                .z1(z - min.getBlockZ())
+                                .blockData(type)
+                                .pattern("single")
+                                .build());
                     }
                 }
             }
@@ -51,6 +53,7 @@ public class WorldEditToVoxelParser {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("name", "Exported Build");
         metadata.put("version", "1.2.0");
+        metadata.put("workflow", "default");
 
         Map<String, Object> regionMap = new HashMap<>();
         regionMap.put("min", createVectorMap(0, 0, 0)); // Relative min

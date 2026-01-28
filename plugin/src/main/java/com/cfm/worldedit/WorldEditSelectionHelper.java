@@ -1,6 +1,6 @@
-package com.cursorminecraft.worldedit;
+package com.cfm.worldedit;
 
-import com.cursorminecraft.util.Logger;
+import com.cfm.util.Logger;
 import com.sk89q.worldedit.IncompleteRegionException;
 import com.sk89q.worldedit.LocalSession;
 import com.sk89q.worldedit.WorldEdit;

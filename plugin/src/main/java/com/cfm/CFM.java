@@ -1,17 +1,18 @@
-package com.cursorminecraft;
+package com.cfm;
 
-import com.cursorminecraft.ai.AIClient;
-import com.cursorminecraft.command.CommandManager;
-import com.cursorminecraft.database.DatabaseManager;
-import com.cursorminecraft.database.dao.BuildDAO;
-import com.cursorminecraft.database.dao.ConversationDAO;
-import com.cursorminecraft.web.WebServer;
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public class CursorMinecraft extends JavaPlugin {
+import com.cfm.ai.AIClient;
+import com.cfm.command.CommandManager;
+import com.cfm.database.DatabaseManager;
+import com.cfm.database.dao.BuildDAO;
+import com.cfm.database.dao.ConversationDAO;
+import com.cfm.web.WebServer;
 
-    private static CursorMinecraft instance;
+public class CFM extends JavaPlugin {
+
+    private static CFM instance;
 
     @Getter
     private DatabaseManager databaseManager;
@@ -80,7 +81,7 @@ public class CursorMinecraft extends JavaPlugin {
         getLogger().info("CFM Configuration and services reloaded!");
     }
 
-    public static CursorMinecraft getInstance() {
+    public static CFM getInstance() {
         return instance;
     }
 }

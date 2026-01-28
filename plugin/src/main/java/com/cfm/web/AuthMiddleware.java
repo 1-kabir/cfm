@@ -1,9 +1,11 @@
-package com.cursorminecraft.web;
+package com.cfm.web;
 
-import com.cursorminecraft.CursorMinecraft;
 import io.javalin.http.Context;
 import io.javalin.http.Handler;
 import org.jetbrains.annotations.NotNull;
+
+import com.cfm.CFM;
+
 import java.util.Base64;
 
 public class AuthMiddleware implements Handler {
@@ -29,8 +31,8 @@ public class AuthMiddleware implements Handler {
         String username = values[0];
         String password = values[1];
 
-        String configUser = CursorMinecraft.getInstance().getConfig().getString("web_interface.auth.username", "admin");
-        String configPass = CursorMinecraft.getInstance().getConfig().getString("web_interface.auth.password",
+        String configUser = CFM.getInstance().getConfig().getString("web_interface.auth.username", "admin");
+        String configPass = CFM.getInstance().getConfig().getString("web_interface.auth.password",
                 "changeme");
 
         if (!username.equals(configUser) || !password.equals(configPass)) {
