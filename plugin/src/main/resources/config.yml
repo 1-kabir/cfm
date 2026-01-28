@@ -1,0 +1,53 @@
+# Cursor for Minecraft Configuration
+
+# Web Interface Settings
+web_interface:
+  enabled: true
+  port: 8080
+  # Basic Authentication credentials
+  auth:
+    username: admin
+    password: changeme
+
+# Database Settings
+database:
+  type: sqlite
+  sqlite:
+    file: data.db
+  # MySQL support (optional)
+  mysql:
+    host: localhost
+    port: 3306
+    database: cursor_minecraft
+    username: root
+    password: ""
+
+# AI Provider Settings
+ai:
+  # Base URL for OpenAI-compatible API
+  # For Gemini, use: https://generativelanguage.googleapis.com/v1beta/openai/
+  endpoint_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  
+  # Your API key
+  api_key: "YOUR_API_KEY_HERE"
+  
+  # Model name
+  # Recommended: gemini-3.0-flash, gemini-3.0-pro-preview
+  model_name: "gemini-3.0-flash"
+  
+  # Thinking level for Gemini 3 (minimal, dynamic, high)
+  thinking_level: "dynamic"
+
+# Build Settings
+build:
+  # Default workflow to use
+  default_workflow: "basic_voxel"
+  # Max blocks allowed in a single build generation
+  max_block_count: 50000
+  # Interval between block placement ticks (set higher if server lags)
+  placement_speed: 1000
+
+# Feature Flags
+features:
+  debug_logging: false
+  show_particles: true

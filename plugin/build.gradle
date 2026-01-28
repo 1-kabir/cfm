@@ -1,5 +1,6 @@
 plugins {
     id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
 group = 'com.cursorminecraft'
@@ -11,10 +12,33 @@ repositories {
         name = 'papermc'
         url = 'https://repo.papermc.io/repository/maven-public/'
     }
+    maven {
+        name = 'enginehub'
+        url = 'https://maven.enginehub.org/repo/'
+    }
 }
 
 dependencies {
-    compileOnly 'io.papermc.paper:paper-api:1.21.3-R0.1-SNAPSHOT'
+    // Paper API
+    compileOnly 'io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT'
+    
+    // AI Client (OpenAI compatible)
+    implementation 'io.github.sashirestela:simple-openai:3.11.0'
+    
+    // Web Server
+    implementation 'io.javalin:javalin:6.3.0'
+    implementation 'org.slf4j:slf4j-simple:2.0.13'
+    
+    // Database
+    implementation 'org.xerial:sqlite-jdbc:3.46.0.0'
+    
+    // WorldEdit API (FAWE compatible)
+    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.4.0'
+    
+    // JSON & Utilities
+    implementation 'com.google.code.gson:gson:2.11.0'
+    implementation 'org.projectlombok:lombok:1.18.32'
+    annotationProcessor 'org.projectlombok:lombok:1.18.32'
 }
 
 java {
@@ -26,3 +50,9 @@ java {
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
+
+shadowJar {
+    archiveClassifier.set('')
+}
+
+build.dependsOn shadowJar

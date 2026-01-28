@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cursor AI | Minecraft Generator</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <div id="login-container" class="auth-screen">
+        <div class="login-card">
+            <h1>Cursor for Minecraft</h1>
+            <p>Enter your credentials to access the AI control panel.</p>
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button id="login-btn">Login</button>
+            <p id="login-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <div id="app-container" class="app-layout hidden">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <button id="new-chat-btn"><i class="fas fa-plus"></i> New Build</button>
+            </div>
+            <div id="conversation-list" class="conversation-list">
+                <!-- Conversations will be loaded here -->
+            </div>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="display-name">Admin</span>
+                </div>
+                <button id="logout-btn"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="build-info">
+                    <h2 id="current-title">New Build</h2>
+                </div>
+                <div class="actions">
+                    <button id="theme-toggle"><i class="fas fa-moon"></i></button>
+                    <button id="settings-btn"><i class="fas fa-cog"></i></button>
+                </div>
+            </header>
+
+            <div id="chat-messages" class="chat-area">
+                <div class="welcome-screen">
+                    <div class="logo-large">C</div>
+                    <h1>What should we build today?</h1>
+                    <div class="suggestions">
+                        <div class="suggestion-card" onclick="setPrompt('Build a gothic cathedral')">
+                            <i class="fas fa-church"></i>
+                            <span>Gothic Cathedral</span>
+                        </div>
+                        <div class="suggestion-card" onclick="setPrompt('Build a modern skyscraper')">
+                            <i class="fas fa-building"></i>
+                            <span>Modern Skyscraper</span>
+                        </div>
+                        <div class="suggestion-card" onclick="setPrompt('Build a small wooden cottage')">
+                            <i class="fas fa-home"></i>
+                            <span>Wooden Cottage</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="input-area">
+                <div class="input-container">
+                    <textarea id="prompt-input" placeholder="Describe your structure..."></textarea>
+                    <div class="input-controls">
+                        <button id="attach-btn"><i class="fas fa-paperclip"></i></button>
+                        <select id="build-mode">
+                            <option value="fast">Fast Mode</option>
+                            <option value="pro">Pro Mode (Thinking)</option>
+                        </select>
+                        <button id="send-btn"><i class="fas fa-arrow-up"></i></button>
+                    </div>
+                </div>
+                <p class="disclaimer">Cursor AI may generate incorrect block placements. Verify with `/aibuild preview`.</p>
+            </footer>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
