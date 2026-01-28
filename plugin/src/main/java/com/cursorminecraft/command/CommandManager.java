@@ -6,11 +6,7 @@ import org.bukkit.command.PluginCommand;
 public class CommandManager {
 
     public void registerCommands() {
-        registerCfmCommand();
-    }
-
-    private void registerCfmCommand() {
-        AIBuildCommand executor = new AIBuildCommand();
+        CFMCommand executor = new CFMCommand();
         PluginCommand command = CursorMinecraft.getInstance().getCommand("cfm");
 
         if (command != null) {

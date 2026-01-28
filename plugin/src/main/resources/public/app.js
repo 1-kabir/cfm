@@ -1,6 +1,6 @@
 /**
- * Cursor for Minecraft - Core Logic
- * High-performance, modern AI chat interface
+ * CFM Neural Portal - Interface Control
+ * Pure, high-performance logic for the architectural dashboard
  */
 
 let currentConversationId = null;
@@ -10,14 +10,17 @@ let isTyping = false;
 // Initialize Lucide Icons
 const refreshIcons = () => lucide.createIcons();
 
-// Auth Check
-const storedAuth = localStorage.getItem('cursor_auth');
+// Auth Bridge
+const storedAuth = localStorage.getItem('cfm_auth');
 if (storedAuth) {
     authHeader = storedAuth;
-    showApp();
+    // Immediate app entry if already authorized
+    document.addEventListener('DOMContentLoaded', () => {
+        showApp(true);
+    });
 }
 
-// UI Elements
+// UI State Selectors
 const loginContainer = document.getElementById('login-container');
 const appContainer = document.getElementById('app-container');
 const conversationList = document.getElementById('conversation-list');
@@ -26,19 +29,19 @@ const promptInput = document.getElementById('prompt-input');
 const emptyState = document.getElementById('empty-state');
 const currentTitle = document.getElementById('current-title');
 
-// Event Listeners
+// Primary Handlers
 document.getElementById('login-btn').addEventListener('click', handleLogin);
 document.getElementById('logout-btn').addEventListener('click', handleLogout);
 document.getElementById('send-btn').addEventListener('click', handleSendMessage);
 document.getElementById('new-chat-btn').addEventListener('click', () => resetChat());
 
-// Auto-resize textarea
+// Textarea Auto-Expansion
 promptInput.addEventListener('input', function () {
     this.style.height = 'auto';
     this.style.height = (this.scrollHeight) + 'px';
 });
 
-// Handle Enter to send
+// Structural Instruction Submission
 promptInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -53,12 +56,13 @@ async function handleLogin() {
     const loginBtn = document.getElementById('login-btn');
 
     if (!user || !pass) {
-        errorMsg.innerText = "Please fill in all fields.";
+        shakeElement(loginBtn);
+        errorMsg.innerText = "Identity and security key required.";
         return;
     }
 
     loginBtn.disabled = true;
-    loginBtn.innerText = "Authenticating...";
+    loginBtn.innerText = "Establishing Link...";
 
     const header = 'Basic ' + btoa(`${user}:${pass}`);
 
@@ -69,28 +73,47 @@ async function handleLogin() {
 
         if (res.ok) {
             authHeader = header;
-            localStorage.setItem('cursor_auth', header);
+            localStorage.setItem('cfm_auth', header);
             showApp();
         } else {
-            errorMsg.innerText = "Invalid credentials. Try again.";
+            shakeElement(loginBtn);
+            errorMsg.innerText = "Security check failed. Access denied.";
             loginBtn.disabled = false;
-            loginBtn.innerText = "Sign In";
+            loginBtn.innerText = "Initialize Link";
         }
     } catch (e) {
-        errorMsg.innerText = "Could not connect to server.";
+        errorMsg.innerText = "Critical connection failure. Portal unreachable.";
         loginBtn.disabled = false;
-        loginBtn.innerText = "Sign In";
+        loginBtn.innerText = "Initialize Link";
     }
 }
 
 function handleLogout() {
-    localStorage.removeItem('cursor_auth');
+    localStorage.removeItem('cfm_auth');
     location.reload();
 }
 
-function showApp() {
-    loginContainer.classList.add('hidden');
-    appContainer.classList.remove('hidden');
+function showApp(immediate = false) {
+    if (immediate) {
+        loginContainer.style.display = 'none';
+        appContainer.classList.remove('hidden');
+        appContainer.style.opacity = '1';
+        appContainer.style.transform = 'scale(1)';
+        appContainer.style.pointerEvents = 'auto';
+    } else {
+        loginContainer.style.opacity = '0';
+        loginContainer.style.transform = 'scale(1.1)';
+        setTimeout(() => {
+            loginContainer.style.display = 'none';
+            appContainer.classList.remove('hidden');
+            // Trigger reflow for transition
+            requestAnimationFrame(() => {
+                appContainer.style.opacity = '1';
+                appContainer.style.transform = 'scale(1)';
+                appContainer.style.pointerEvents = 'auto';
+            });
+        }, 500);
+    }
     loadConversations();
     refreshIcons();
 }
@@ -106,17 +129,17 @@ async function loadConversations() {
 
         conversationList.innerHTML = '';
         if (data.length === 0) {
-            conversationList.innerHTML = '<div class="p-4 text-center text-xs text-[#52525b]">No builds yet</div>';
+            conversationList.innerHTML = '<div class="p-6 text-center text-[10px] text-[#3f3f46] font-bold uppercase tracking-widest">No previous matrices</div>';
             return;
         }
 
         data.sort((a, b) => b.id - a.id).forEach(conv => {
             const item = document.createElement('div');
-            item.className = `conv-item w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer text-sm mb-1 border border-transparent ${currentConversationId === conv.id ? 'active' : 'hover:bg-[#18181b]'}`;
+            item.className = `conv-item w-full flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer text-sm mb-1 border border-transparent ${currentConversationId === conv.id ? 'active' : 'hover:bg-[#121214]'}`;
             item.innerHTML = `
-                <div class="flex items-center gap-2 truncate">
-                    <i data-lucide="message-square" class="w-4 h-4 text-[#52525b]"></i>
-                    <span class="truncate font-medium">${conv.title}</span>
+                <div class="flex items-center gap-3 truncate">
+                    <i data-lucide="layers" class="w-4 h-4 text-[#52525b]"></i>
+                    <span class="truncate font-semibold text-[#fafafa]">${conv.title}</span>
                 </div>
             `;
             item.onclick = () => loadConversation(conv.id, conv.title);
@@ -124,24 +147,25 @@ async function loadConversations() {
         });
         refreshIcons();
     } catch (e) {
-        console.error("Failed to load conversations", e);
+        console.error("Matrix load failure", e);
     }
 }
 
 async function loadConversation(id, title) {
+    if (currentConversationId === id) return;
+
     currentConversationId = id;
     currentTitle.innerText = title;
     emptyState.classList.add('hidden');
-    loadConversations(); // Update active state
+    loadConversations();
 
     chatMessages.innerHTML = '';
 
-    try {
-        // In a real app, you'd fetch message history here
-        addMessage('assistant', `Loaded build session: **${title}**. I'm ready to continue or modify this structure.`);
-    } catch (e) {
-        console.error("Failed to load conversation", e);
-    }
+    // Smooth scroll to top when changing
+    chatMessages.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Simulate construction log
+    addMessage('assistant', `Constructing context from session **#${id}**. Matrix ready.`);
 }
 
 async function handleSendMessage() {
@@ -176,7 +200,7 @@ async function handleSendMessage() {
         addMessage('assistant', data.response);
     } catch (e) {
         hideTypingIndicator();
-        addMessage('assistant', "Error: Connection lost. Ensure the plugin is still running.");
+        addMessage('assistant', "Neural link severed. Verify server status and configuration.");
     }
 }
 
@@ -199,7 +223,7 @@ async function createConversation(title) {
         currentConversationId = data.id;
         loadConversations();
     } catch (e) {
-        console.error("Failed to create conversation", e);
+        console.error("Matrix instantiation failed", e);
     }
 }
 
@@ -210,7 +234,7 @@ function addMessage(role, text) {
     const formattedText = marked.parse(text);
 
     msgDiv.innerHTML = `
-        <div class="avatar">${role === 'user' ? 'U' : 'C'}</div>
+        <div class="avatar">${role === 'user' ? 'CF' : 'M'}</div>
         <div class="message-content">
             <div class="message-bubble">
                 ${formattedText}
@@ -226,9 +250,9 @@ function showTypingIndicator() {
     isTyping = true;
     const indicator = document.createElement('div');
     indicator.id = 'typing-indicator-wrapper';
-    indicator.className = 'message assistant';
+    indicator.className = 'message assistant animate-in fade-in slide-in-from-bottom-2 duration-300';
     indicator.innerHTML = `
-        <div class="avatar">C</div>
+        <div class="avatar">M</div>
         <div class="message-content">
             <div class="typing-indicator">
                 <div class="dot"></div>
@@ -249,7 +273,7 @@ function hideTypingIndicator() {
 
 function resetChat() {
     currentConversationId = null;
-    currentTitle.innerText = "New Build";
+    currentTitle.innerText = "Operations Dashboard";
     chatMessages.innerHTML = '';
     emptyState.classList.remove('hidden');
     loadConversations();
@@ -258,6 +282,10 @@ function resetChat() {
 function setPrompt(text) {
     promptInput.value = text;
     promptInput.focus();
-    promptInput.style.height = 'auto';
-    promptInput.style.height = (promptInput.scrollHeight) + 'px';
+    promptInput.dispatchEvent(new Event('input'));
+}
+
+function shakeElement(el) {
+    el.classList.add('translate-x-1');
+    setTimeout(() => el.classList.remove('translate-x-1'), 100);
 }

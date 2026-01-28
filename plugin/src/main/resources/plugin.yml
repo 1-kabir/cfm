@@ -8,7 +8,7 @@ depend: [WorldEdit]
 commands:
   cfm:
     description: Main command for CFM (Cursor for Minecraft)
-    usage: /<command> [help|create|tool|list|parse|jsonparse]
+    usage: /<command> [help|create|tool|list|parse|jsonparse|reload]
     permission: cfm.admin
 
 permissions:

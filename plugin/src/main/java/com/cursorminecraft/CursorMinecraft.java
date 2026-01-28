@@ -67,6 +67,19 @@ public class CursorMinecraft extends JavaPlugin {
         getLogger().info("CFM has been disabled!");
     }
 
+    public void reloadPlugin() {
+        reloadConfig();
+        if (aiClient != null) {
+            aiClient = new AIClient();
+        }
+        if (webServer != null) {
+            webServer.stop();
+            webServer = new WebServer();
+            webServer.start();
+        }
+        getLogger().info("CFM Configuration and services reloaded!");
+    }
+
     public static CursorMinecraft getInstance() {
         return instance;
     }
