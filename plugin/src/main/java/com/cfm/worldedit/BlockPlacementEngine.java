@@ -9,14 +9,12 @@ import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BlockState;
 import com.sk89q.worldedit.world.block.BlockType;
+import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 public class BlockPlacementEngine {
 
@@ -28,26 +26,65 @@ public class BlockPlacementEngine {
         com.sk89q.worldedit.world.World weWorld = BukkitAdapter.adapt(world);
 
         try (EditSession editSession = WorldEdit.getInstance().newEditSession(weWorld)) {
-            // Two-pass rendering for proper block connectivity
-            List<PlacementRecord> records = new ArrayList<>();
+            Set<BlockVector3> affectedPositions = new HashSet<>();
 
-            // Pass 1: Place all blocks
+            // Phase 1: Validate and place all blocks
             for (VoxelSchemaParser.BuildOperation op : operations) {
-                records.addAll(handleOperation(editSession, op, origin));
+                List<PlacementRecord> records = handleOperation(editSession, op, origin, weWorld);
+                for (PlacementRecord record : records) {
+                    affectedPositions.add(record.position);
+                }
             }
 
-            // Pass 2: Update connecting blocks (fences, panes, walls, stairs)
-            updateConnectingBlocks(editSession, records, weWorld);
-
             editSession.close();
+
+            // Phase 2: Force neighbor updates via Bukkit
+            Bukkit.getScheduler().runTask(player.getServer().getPluginManager().getPlugin("CFM"), () -> {
+                Set<Chunk> chunksToUpdate = new HashSet<>();
+
+                for (BlockVector3 pos : affectedPositions) {
+                    org.bukkit.Location loc = new org.bukkit.Location(world, pos.getX(), pos.getY(), pos.getZ());
+                    org.bukkit.block.Block block = loc.getBlock();
+
+                    // Update the block and its neighbors
+                    block.getState().update(true, true);
+
+                    // Force neighbor updates in all 6 directions
+                    updateNeighbor(world, loc.clone().add(1, 0, 0));
+                    updateNeighbor(world, loc.clone().add(-1, 0, 0));
+                    updateNeighbor(world, loc.clone().add(0, 1, 0));
+                    updateNeighbor(world, loc.clone().add(0, -1, 0));
+                    updateNeighbor(world, loc.clone().add(0, 0, 1));
+                    updateNeighbor(world, loc.clone().add(0, 0, -1));
+
+                    chunksToUpdate.add(loc.getChunk());
+                }
+
+                // Force chunk updates
+                for (Chunk chunk : chunksToUpdate) {
+                    world.refreshChunk(chunk.getX(), chunk.getZ());
+                }
+            });
+
             Logger.info("Build placed for player " + player.getName() + " (" + operations.size() + " operations)");
         } catch (Exception e) {
             Logger.error("Failed to place build", e);
         }
     }
 
+    private static void updateNeighbor(World world, org.bukkit.Location loc) {
+        try {
+            org.bukkit.block.Block block = loc.getBlock();
+            if (block != null && !block.getType().isAir()) {
+                block.getState().update(true, false);
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+    }
+
     private static List<PlacementRecord> handleOperation(EditSession editSession, VoxelSchemaParser.BuildOperation op,
-            BlockVector3 origin) throws MaxChangedBlocksException {
+            BlockVector3 origin, com.sk89q.worldedit.world.World weWorld) throws MaxChangedBlocksException {
         List<PlacementRecord> records = new ArrayList<>();
         String pattern = op.getPattern() != null ? op.getPattern().toLowerCase() : "single";
 
@@ -57,11 +94,19 @@ public class BlockPlacementEngine {
 
         int x1 = op.getX1(), y1 = op.getY1(), z1 = op.getZ1();
 
-        if (pattern.equals("single")) {
+        if (pattern.equals("single") || pattern.equals("door")) {
             BlockVector3 pos = origin.add(x1, y1, z1);
+
+            // Validate placement
+            if (pattern.equals("door") && !canPlaceDoor(weWorld, pos, op.getBlockData())) {
+                Logger.warn("Skipping invalid door placement at " + pos);
+                return records;
+            }
+
             BlockState state = palette.getRandomState();
             editSession.setBlock(pos, state);
             records.add(new PlacementRecord(pos, state));
+
         } else if (op.getX2() != null && op.getY2() != null && op.getZ2() != null) {
             int x2 = op.getX2(), y2 = op.getY2(), z2 = op.getZ2();
 
@@ -90,7 +135,7 @@ public class BlockPlacementEngine {
                     }
                 }
             }
-        } else if (pattern.equals("door") || pattern.equals("layer")) {
+        } else if (pattern.equals("layer")) {
             BlockVector3 pos = origin.add(x1, y1, z1);
             BlockState state = palette.getRandomState();
             editSession.setBlock(pos, state);
@@ -100,105 +145,31 @@ public class BlockPlacementEngine {
         return records;
     }
 
-    private static void updateConnectingBlocks(EditSession editSession, List<PlacementRecord> records,
-            com.sk89q.worldedit.world.World world) throws MaxChangedBlocksException {
-        for (PlacementRecord record : records) {
-            BlockState state = record.state;
-            BlockType type = state.getBlockType();
-            String typeName = type.getId();
+    private static boolean canPlaceDoor(com.sk89q.worldedit.world.World world, BlockVector3 pos, String blockData) {
+        try {
+            // Check if this is an upper door half
+            if (blockData.contains("half=upper")) {
+                // Check if there's a lower half below
+                BlockState below = world.getBlock(pos.subtract(0, 1, 0));
+                String belowId = below.getBlockType().getId();
+                return belowId.contains("door");
+            } else if (blockData.contains("half=lower")) {
+                // Check if position is clear and not already a door
+                BlockState current = world.getBlock(pos);
+                BlockState above = world.getBlock(pos.add(0, 1, 0));
 
-            // Update fences, panes, walls, iron bars
-            if (typeName.contains("fence") || typeName.contains("pane") ||
-                    typeName.contains("wall") || typeName.contains("bars") ||
-                    typeName.contains("chain")) {
-
-                BlockVector3 pos = record.position;
-                BlockState updated = computeConnectingState(world, pos, state);
-                if (updated != null) {
-                    editSession.setBlock(pos, updated);
+                if (current.getBlockType().getId().contains("door")) {
+                    return false; // Already a door here
                 }
-            }
-        }
-    }
-
-    private static BlockState computeConnectingState(com.sk89q.worldedit.world.World world,
-            BlockVector3 pos, BlockState original) {
-        try {
-            BlockType type = original.getBlockType();
-            Map<String, Object> states = new HashMap<>();
-
-            // Check all 4 cardinal directions
-            boolean north = canConnect(world, pos.add(0, 0, -1), type);
-            boolean south = canConnect(world, pos.add(0, 0, 1), type);
-            boolean east = canConnect(world, pos.add(1, 0, 0), type);
-            boolean west = canConnect(world, pos.add(-1, 0, 0), type);
-
-            String typeId = type.getId();
-
-            if (typeId.contains("pane") || typeId.contains("bars")) {
-                states.put("north", north ? "true" : "false");
-                states.put("south", south ? "true" : "false");
-                states.put("east", east ? "true" : "false");
-                states.put("west", west ? "true" : "false");
-            } else if (typeId.contains("fence") || typeId.contains("wall")) {
-                states.put("north", north ? "true" : "false");
-                states.put("south", south ? "true" : "false");
-                states.put("east", east ? "true" : "false");
-                states.put("west", west ? "true" : "false");
-            }
-
-            if (states.isEmpty())
-                return null;
-
-            StringBuilder stateString = new StringBuilder(typeId);
-            stateString.append("[");
-            boolean first = true;
-            for (Map.Entry<String, Object> entry : states.entrySet()) {
-                if (!first)
-                    stateString.append(",");
-                stateString.append(entry.getKey()).append("=").append(entry.getValue());
-                first = false;
-            }
-            stateString.append("]");
-
-            return parseBlock(stateString.toString());
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static boolean canConnect(com.sk89q.worldedit.world.World world, BlockVector3 pos, BlockType originalType) {
-        try {
-            BlockState neighbor = world.getBlock(pos);
-            if (neighbor.getBlockType().getMaterial().isAir())
-                return false;
-
-            String neighborId = neighbor.getBlockType().getId();
-            String originalId = originalType.getId();
-
-            // Same type always connects
-            if (neighborId.equals(originalId))
-                return true;
-
-            // Fences connect to solid blocks
-            if (originalId.contains("fence") && neighbor.getBlockType().getMaterial().isSolid()) {
+                if (above.getBlockType().getId().contains("door")) {
+                    return false; // Door above
+                }
                 return true;
             }
-
-            // Glass panes only connect to panes
-            if (originalId.contains("pane")) {
-                return neighborId.contains("pane");
-            }
-
-            // Walls connect to walls and some solid blocks
-            if (originalId.contains("wall")) {
-                return neighborId.contains("wall") || neighbor.getBlockType().getMaterial().isSolid();
-            }
-
-            return false;
         } catch (Exception e) {
-            return false;
+            Logger.warn("Door validation failed: " + e.getMessage());
         }
+        return true;
     }
 
     private static boolean isPointOnLine(int x, int y, int z, int x1, int y1, int z1, int x2, int y2, int z2) {

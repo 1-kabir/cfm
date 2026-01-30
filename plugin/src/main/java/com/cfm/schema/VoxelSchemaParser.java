@@ -70,7 +70,49 @@ public class VoxelSchemaParser {
         private final int x, y, z;
     }
 
+    /**
+     * Extract JSON from LLM response that may be wrapped in markdown code blocks
+     */
+    private static String extractJSON(String input) {
+        if (input == null || input.trim().isEmpty()) {
+            return input;
+        }
+
+        String trimmed = input.trim();
+
+        // Check for triple backtick code blocks
+        if (trimmed.startsWith("```")) {
+            // Remove opening ```json or ```
+            int firstNewline = trimmed.indexOf('\n');
+            if (firstNewline > 0) {
+                trimmed = trimmed.substring(firstNewline + 1);
+            }
+
+            // Remove closing ```
+            if (trimmed.endsWith("```")) {
+                trimmed = trimmed.substring(0, trimmed.lastIndexOf("```"));
+            }
+        }
+
+        trimmed = trimmed.trim();
+
+        // Find the actual JSON object/array
+        int jsonStart = trimmed.indexOf('{');
+        if (jsonStart < 0) {
+            jsonStart = trimmed.indexOf('[');
+        }
+
+        if (jsonStart > 0) {
+            trimmed = trimmed.substring(jsonStart);
+        }
+
+        return trimmed;
+    }
+
     public static BuildSchema parseFullSchema(String json) {
+        // Extract JSON from potential markdown wrapper
+        json = extractJSON(json);
+
         JsonElement element = JsonParser.parseString(json);
         List<BuildOperation> operations = new ArrayList<>();
         BuildMetadata metadata = null;
