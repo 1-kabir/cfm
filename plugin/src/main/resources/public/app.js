@@ -1,47 +1,35 @@
-/**
- * CFM Neural Portal - Interface Control
- * Pure, high-performance logic for the architectural dashboard
- */
-
 let currentConversationId = null;
 let authHeader = null;
 let isTyping = false;
 
-// Initialize Lucide Icons
-const refreshIcons = () => lucide.createIcons();
-
-// Auth Bridge
+// Check for stored auth
 const storedAuth = localStorage.getItem('cfm_auth');
 if (storedAuth) {
     authHeader = storedAuth;
-    // Immediate app entry if already authorized
-    document.addEventListener('DOMContentLoaded', () => {
-        showApp(true);
-    });
+    document.addEventListener('DOMContentLoaded', () => showApp(true));
 }
 
-// UI State Selectors
+// Elements
 const loginContainer = document.getElementById('login-container');
 const appContainer = document.getElementById('app-container');
 const conversationList = document.getElementById('conversation-list');
 const chatMessages = document.getElementById('chat-messages');
 const promptInput = document.getElementById('prompt-input');
 const emptyState = document.getElementById('empty-state');
-const currentTitle = document.getElementById('current-title');
 
-// Primary Handlers
+// Event Listeners
 document.getElementById('login-btn').addEventListener('click', handleLogin);
 document.getElementById('logout-btn').addEventListener('click', handleLogout);
 document.getElementById('send-btn').addEventListener('click', handleSendMessage);
-document.getElementById('new-chat-btn').addEventListener('click', () => resetChat());
+document.getElementById('new-chat-btn').addEventListener('click', resetChat);
 
-// Textarea Auto-Expansion
+// Auto-resize textarea
 promptInput.addEventListener('input', function () {
     this.style.height = 'auto';
     this.style.height = (this.scrollHeight) + 'px';
 });
 
-// Structural Instruction Submission
+// Enter to send
 promptInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -56,35 +44,31 @@ async function handleLogin() {
     const loginBtn = document.getElementById('login-btn');
 
     if (!user || !pass) {
-        shakeElement(loginBtn);
-        errorMsg.innerText = "Identity and security key required.";
+        errorMsg.innerText = "Both fields required";
         return;
     }
 
     loginBtn.disabled = true;
-    loginBtn.innerText = "Establishing Link...";
+    loginBtn.innerText = "Connecting...";
 
     const header = 'Basic ' + btoa(`${user}:${pass}`);
 
     try {
-        const res = await fetch('/api/health', {
-            headers: { 'Authorization': header }
-        });
+        const res = await fetch('/api/health', { headers: { 'Authorization': header } });
 
         if (res.ok) {
             authHeader = header;
             localStorage.setItem('cfm_auth', header);
             showApp();
         } else {
-            shakeElement(loginBtn);
-            errorMsg.innerText = "Security check failed. Access denied.";
+            errorMsg.innerText = "Invalid credentials";
             loginBtn.disabled = false;
-            loginBtn.innerText = "Initialize Link";
+            loginBtn.innerText = "Access Portal";
         }
     } catch (e) {
-        errorMsg.innerText = "Critical connection failure. Portal unreachable.";
+        errorMsg.innerText = "Connection failed";
         loginBtn.disabled = false;
-        loginBtn.innerText = "Initialize Link";
+        loginBtn.innerText = "Access Portal";
     }
 }
 
@@ -95,27 +79,15 @@ function handleLogout() {
 
 function showApp(immediate = false) {
     if (immediate) {
-        loginContainer.style.display = 'none';
+        loginContainer.classList.add('hidden');
         appContainer.classList.remove('hidden');
-        appContainer.style.opacity = '1';
-        appContainer.style.transform = 'scale(1)';
-        appContainer.style.pointerEvents = 'auto';
     } else {
-        loginContainer.style.opacity = '0';
-        loginContainer.style.transform = 'scale(1.1)';
         setTimeout(() => {
-            loginContainer.style.display = 'none';
+            loginContainer.classList.add('hidden');
             appContainer.classList.remove('hidden');
-            // Trigger reflow for transition
-            requestAnimationFrame(() => {
-                appContainer.style.opacity = '1';
-                appContainer.style.transform = 'scale(1)';
-                appContainer.style.pointerEvents = 'auto';
-            });
-        }, 500);
+        }, 100);
     }
     loadConversations();
-    refreshIcons();
 }
 
 async function loadConversations() {
@@ -129,25 +101,19 @@ async function loadConversations() {
 
         conversationList.innerHTML = '';
         if (data.length === 0) {
-            conversationList.innerHTML = '<div class="p-6 text-center text-[10px] text-[#3f3f46] font-bold uppercase tracking-widest">No previous matrices</div>';
+            conversationList.innerHTML = '<div style="padding: 20px; text-align: center; font-size: 12px; color: var(--gray-400);">No conversations</div>';
             return;
         }
 
         data.sort((a, b) => b.id - a.id).forEach(conv => {
             const item = document.createElement('div');
-            item.className = `conv-item w-full flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer text-sm mb-1 border border-transparent ${currentConversationId === conv.id ? 'active' : 'hover:bg-[#121214]'}`;
-            item.innerHTML = `
-                <div class="flex items-center gap-3 truncate">
-                    <i data-lucide="layers" class="w-4 h-4 text-[#52525b]"></i>
-                    <span class="truncate font-semibold text-[#fafafa]">${conv.title}</span>
-                </div>
-            `;
+            item.className = `conv-item ${currentConversationId === conv.id ? 'active' : ''}`;
+            item.textContent = conv.title;
             item.onclick = () => loadConversation(conv.id, conv.title);
             conversationList.appendChild(item);
         });
-        refreshIcons();
     } catch (e) {
-        console.error("Matrix load failure", e);
+        console.error("Failed to load conversations", e);
     }
 }
 
@@ -155,27 +121,19 @@ async function loadConversation(id, title) {
     if (currentConversationId === id) return;
 
     currentConversationId = id;
-    currentTitle.innerText = title;
     emptyState.classList.add('hidden');
     loadConversations();
-
     chatMessages.innerHTML = '';
-
-    // Smooth scroll to top when changing
-    chatMessages.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Simulate construction log
-    addMessage('assistant', `Constructing context from session **#${id}**. Matrix ready.`);
+    addMessage('assistant', `Loaded conversation: ${title}`);
 }
 
 async function handleSendMessage() {
     const msg = promptInput.value.trim();
     if (!msg || isTyping) return;
 
-    if (emptyState) emptyState.classList.add('hidden');
+    emptyState.classList.add('hidden');
 
     if (!currentConversationId) {
-        currentTitle.innerText = msg.substring(0, 30);
         await createConversation(msg);
     }
 
@@ -200,7 +158,7 @@ async function handleSendMessage() {
         addMessage('assistant', data.response);
     } catch (e) {
         hideTypingIndicator();
-        addMessage('assistant', "Neural link severed. Verify server status and configuration.");
+        addMessage('assistant', "Error: Failed to communicate with server.");
     }
 }
 
@@ -223,7 +181,7 @@ async function createConversation(title) {
         currentConversationId = data.id;
         loadConversations();
     } catch (e) {
-        console.error("Matrix instantiation failed", e);
+        console.error("Failed to create conversation", e);
     }
 }
 
@@ -234,12 +192,8 @@ function addMessage(role, text) {
     const formattedText = marked.parse(text);
 
     msgDiv.innerHTML = `
-        <div class="avatar">${role === 'user' ? 'CF' : 'M'}</div>
-        <div class="message-content">
-            <div class="message-bubble">
-                ${formattedText}
-            </div>
-        </div>
+        <div class="message-role">${role}</div>
+        <div class="message-content">${formattedText}</div>
     `;
 
     chatMessages.appendChild(msgDiv);
@@ -249,16 +203,13 @@ function addMessage(role, text) {
 function showTypingIndicator() {
     isTyping = true;
     const indicator = document.createElement('div');
-    indicator.id = 'typing-indicator-wrapper';
-    indicator.className = 'message assistant animate-in fade-in slide-in-from-bottom-2 duration-300';
+    indicator.id = 'typing-indicator';
+    indicator.className = 'typing';
     indicator.innerHTML = `
-        <div class="avatar">M</div>
-        <div class="message-content">
-            <div class="typing-indicator">
-                <div class="dot"></div>
-                <div class="dot"></div>
-                <div class="dot"></div>
-            </div>
+        <div class="typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
         </div>
     `;
     chatMessages.appendChild(indicator);
@@ -267,25 +218,13 @@ function showTypingIndicator() {
 
 function hideTypingIndicator() {
     isTyping = false;
-    const el = document.getElementById('typing-indicator-wrapper');
+    const el = document.getElementById('typing-indicator');
     if (el) el.remove();
 }
 
 function resetChat() {
     currentConversationId = null;
-    currentTitle.innerText = "Operations Dashboard";
     chatMessages.innerHTML = '';
     emptyState.classList.remove('hidden');
     loadConversations();
-}
-
-function setPrompt(text) {
-    promptInput.value = text;
-    promptInput.focus();
-    promptInput.dispatchEvent(new Event('input'));
-}
-
-function shakeElement(el) {
-    el.classList.add('translate-x-1');
-    setTimeout(() => el.classList.remove('translate-x-1'), 100);
 }

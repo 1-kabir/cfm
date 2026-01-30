@@ -8,11 +8,14 @@ import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BlockState;
+import com.sk89q.worldedit.world.block.BlockType;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class BlockPlacementEngine {
@@ -25,13 +28,17 @@ public class BlockPlacementEngine {
         com.sk89q.worldedit.world.World weWorld = BukkitAdapter.adapt(world);
 
         try (EditSession editSession = WorldEdit.getInstance().newEditSession(weWorld)) {
-            // Disable fast mode to ensure block updates/physics (helps with fences, panes,
-            // doors)
-            editSession.setFastMode(false);
+            // Two-pass rendering for proper block connectivity
+            List<PlacementRecord> records = new ArrayList<>();
 
+            // Pass 1: Place all blocks
             for (VoxelSchemaParser.BuildOperation op : operations) {
-                handleOperation(player, editSession, op, origin);
+                records.addAll(handleOperation(editSession, op, origin));
             }
+
+            // Pass 2: Update connecting blocks (fences, panes, walls, stairs)
+            updateConnectingBlocks(editSession, records, weWorld);
+
             editSession.close();
             Logger.info("Build placed for player " + player.getName() + " (" + operations.size() + " operations)");
         } catch (Exception e) {
@@ -39,19 +46,22 @@ public class BlockPlacementEngine {
         }
     }
 
-    private static void handleOperation(Player player, EditSession editSession, VoxelSchemaParser.BuildOperation op,
+    private static List<PlacementRecord> handleOperation(EditSession editSession, VoxelSchemaParser.BuildOperation op,
             BlockVector3 origin) throws MaxChangedBlocksException {
+        List<PlacementRecord> records = new ArrayList<>();
         String pattern = op.getPattern() != null ? op.getPattern().toLowerCase() : "single";
 
-        // Handle potential palette
         WeightedPalette palette = new WeightedPalette(op.getBlockData());
         if (palette.isEmpty())
-            return;
+            return records;
 
         int x1 = op.getX1(), y1 = op.getY1(), z1 = op.getZ1();
 
         if (pattern.equals("single")) {
-            editSession.setBlock(origin.add(x1, y1, z1), palette.getRandomState());
+            BlockVector3 pos = origin.add(x1, y1, z1);
+            BlockState state = palette.getRandomState();
+            editSession.setBlock(pos, state);
+            records.add(new PlacementRecord(pos, state));
         } else if (op.getX2() != null && op.getY2() != null && op.getZ2() != null) {
             int x2 = op.getX2(), y2 = op.getY2(), z2 = op.getZ2();
 
@@ -72,13 +82,122 @@ public class BlockPlacementEngine {
                         };
 
                         if (shouldPlace) {
-                            editSession.setBlock(origin.add(x, y, z), palette.getRandomState());
+                            BlockVector3 pos = origin.add(x, y, z);
+                            BlockState state = palette.getRandomState();
+                            editSession.setBlock(pos, state);
+                            records.add(new PlacementRecord(pos, state));
                         }
                     }
                 }
             }
         } else if (pattern.equals("door") || pattern.equals("layer")) {
-            editSession.setBlock(origin.add(x1, y1, z1), palette.getRandomState());
+            BlockVector3 pos = origin.add(x1, y1, z1);
+            BlockState state = palette.getRandomState();
+            editSession.setBlock(pos, state);
+            records.add(new PlacementRecord(pos, state));
+        }
+
+        return records;
+    }
+
+    private static void updateConnectingBlocks(EditSession editSession, List<PlacementRecord> records,
+            com.sk89q.worldedit.world.World world) throws MaxChangedBlocksException {
+        for (PlacementRecord record : records) {
+            BlockState state = record.state;
+            BlockType type = state.getBlockType();
+            String typeName = type.getId();
+
+            // Update fences, panes, walls, iron bars
+            if (typeName.contains("fence") || typeName.contains("pane") ||
+                    typeName.contains("wall") || typeName.contains("bars") ||
+                    typeName.contains("chain")) {
+
+                BlockVector3 pos = record.position;
+                BlockState updated = computeConnectingState(world, pos, state);
+                if (updated != null) {
+                    editSession.setBlock(pos, updated);
+                }
+            }
+        }
+    }
+
+    private static BlockState computeConnectingState(com.sk89q.worldedit.world.World world,
+            BlockVector3 pos, BlockState original) {
+        try {
+            BlockType type = original.getBlockType();
+            Map<String, Object> states = new HashMap<>();
+
+            // Check all 4 cardinal directions
+            boolean north = canConnect(world, pos.add(0, 0, -1), type);
+            boolean south = canConnect(world, pos.add(0, 0, 1), type);
+            boolean east = canConnect(world, pos.add(1, 0, 0), type);
+            boolean west = canConnect(world, pos.add(-1, 0, 0), type);
+
+            String typeId = type.getId();
+
+            if (typeId.contains("pane") || typeId.contains("bars")) {
+                states.put("north", north ? "true" : "false");
+                states.put("south", south ? "true" : "false");
+                states.put("east", east ? "true" : "false");
+                states.put("west", west ? "true" : "false");
+            } else if (typeId.contains("fence") || typeId.contains("wall")) {
+                states.put("north", north ? "true" : "false");
+                states.put("south", south ? "true" : "false");
+                states.put("east", east ? "true" : "false");
+                states.put("west", west ? "true" : "false");
+            }
+
+            if (states.isEmpty())
+                return null;
+
+            StringBuilder stateString = new StringBuilder(typeId);
+            stateString.append("[");
+            boolean first = true;
+            for (Map.Entry<String, Object> entry : states.entrySet()) {
+                if (!first)
+                    stateString.append(",");
+                stateString.append(entry.getKey()).append("=").append(entry.getValue());
+                first = false;
+            }
+            stateString.append("]");
+
+            return parseBlock(stateString.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean canConnect(com.sk89q.worldedit.world.World world, BlockVector3 pos, BlockType originalType) {
+        try {
+            BlockState neighbor = world.getBlock(pos);
+            if (neighbor.getBlockType().getMaterial().isAir())
+                return false;
+
+            String neighborId = neighbor.getBlockType().getId();
+            String originalId = originalType.getId();
+
+            // Same type always connects
+            if (neighborId.equals(originalId))
+                return true;
+
+            // Fences connect to solid blocks
+            if (originalId.contains("fence") && neighbor.getBlockType().getMaterial().isSolid()) {
+                return true;
+            }
+
+            // Glass panes only connect to panes
+            if (originalId.contains("pane")) {
+                return neighborId.contains("pane");
+            }
+
+            // Walls connect to walls and some solid blocks
+            if (originalId.contains("wall")) {
+                return neighborId.contains("wall") || neighbor.getBlockType().getMaterial().isSolid();
+            }
+
+            return false;
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -98,7 +217,6 @@ public class BlockPlacementEngine {
         try {
             return WorldEdit.getInstance().getBlockFactory().parseFromInput(blockData, null).toImmutableState();
         } catch (Exception e) {
-            // Simplified fallback
             String materialName = blockData.contains("[") ? blockData.substring(0, blockData.indexOf("[")) : blockData;
             if (materialName.startsWith("minecraft:"))
                 materialName = materialName.substring(10);
@@ -165,6 +283,16 @@ public class BlockPlacementEngine {
                 }
             }
             return states.get(0);
+        }
+    }
+
+    private static class PlacementRecord {
+        final BlockVector3 position;
+        final BlockState state;
+
+        PlacementRecord(BlockVector3 position, BlockState state) {
+            this.position = position;
+            this.state = state;
         }
     }
 }
