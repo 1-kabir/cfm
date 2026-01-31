@@ -8,7 +8,6 @@ import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BlockState;
-import com.sk89q.worldedit.world.block.BlockType;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -40,16 +39,29 @@ public class BlockPlacementEngine {
                 }
             }
 
-            // Phase 2: Manual Connection Fix & Physics Update
+            // Phase 2: Manual Connection Fix & Physics Update (Now targeting Neighbors
+            // too!)
             Bukkit.getScheduler().runTask(player.getServer().getPluginManager().getPlugin("CFM"), () -> {
+                Set<BlockVector3> toUpdate = new HashSet<>(affectedPositions);
+
+                // Add all neighbors of placed blocks to the update list
+                // This ensures existing fences snap to the new ones
                 for (BlockVector3 pos : affectedPositions) {
+                    toUpdate.add(pos.add(1, 0, 0));
+                    toUpdate.add(pos.add(-1, 0, 0));
+                    toUpdate.add(pos.add(0, 0, 1));
+                    toUpdate.add(pos.add(0, 0, -1));
+                }
+
+                for (BlockVector3 pos : toUpdate) {
                     org.bukkit.Location loc = new org.bukkit.Location(world, pos.getX(), pos.getY(), pos.getZ());
                     Block block = loc.getBlock();
 
-                    // 1. Explicitly fix connections for Fences, Panes, Walls, etc.
-                    fixVisualConnections(block);
+                    if (isConnectable(block.getType())) {
+                        fixVisualConnections(block);
+                    }
 
-                    // 2. Trigger physics update for everything else (redstone, etc.)
+                    // Trigger physics update for everything
                     block.getState().update(true, true);
                 }
             });
@@ -60,9 +72,14 @@ public class BlockPlacementEngine {
         }
     }
 
+    private static boolean isConnectable(Material mat) {
+        String name = mat.name();
+        return name.contains("FENCE") || name.contains("GLASS_PANE") ||
+                name.contains("WALL") || name.contains("IRON_BARS");
+    }
+
     /**
      * Manually calculates and sets connection states for MultipleFacing blocks.
-     * This ensures fences/panes connect even if automatic physics fails.
      */
     private static void fixVisualConnections(Block block) {
         BlockData data = block.getBlockData();
@@ -71,7 +88,6 @@ public class BlockPlacementEngine {
             MultipleFacing facing = (MultipleFacing) data;
             boolean changed = false;
 
-            // Check all allowed faces for this block type
             for (BlockFace face : facing.getAllowedFaces()) {
                 if (shouldConnect(block, face)) {
                     if (!facing.hasFace(face)) {
@@ -87,7 +103,7 @@ public class BlockPlacementEngine {
             }
 
             if (changed) {
-                block.setBlockData(facing, true); // applyPhysics = true
+                block.setBlockData(facing, true);
             }
         }
     }
@@ -100,7 +116,8 @@ public class BlockPlacementEngine {
         Material sourceMat = source.getType();
         Material targetMat = neighbor.getType();
 
-        // Always connect to self
+        if (neighbor.getType().isAir())
+            return false;
         if (sourceMat == targetMat)
             return true;
 
@@ -109,19 +126,15 @@ public class BlockPlacementEngine {
         boolean isWall = sourceMat.name().contains("WALL");
 
         if (isFence) {
-            // Fences connect to solid blocks and other fences/gates
-            return targetMat.isSolid() && !targetMat.name().contains("LEAVES") && !targetMat.name().contains("BARRIER")
-                    || targetMat.name().contains("FENCE_GATE");
+            return (targetMat.isSolid() && targetMat.isOccluding()) || targetMat.name().contains("FENCE_GATE");
         }
 
         if (isPane) {
-            // Panes connect to other panes and full solid blocks
             return targetMat.name().contains("GLASS_PANE") || targetMat.name().contains("IRON_BARS")
                     || (targetMat.isSolid() && targetMat.isOccluding());
         }
 
         if (isWall) {
-            // Walls connect to walls, gates, and solid blocks
             return targetMat.name().contains("WALL") || targetMat.name().contains("FENCE_GATE")
                     || (targetMat.isSolid() && targetMat.isOccluding());
         }
@@ -142,20 +155,14 @@ public class BlockPlacementEngine {
 
         if (pattern.equals("single") || pattern.equals("door")) {
             BlockVector3 pos = origin.add(x1, y1, z1);
-
-            // Validate placement
-            if (pattern.equals("door") && !canPlaceDoor(weWorld, pos, op.getBlockData())) {
-                Logger.warn("Skipping invalid door placement at " + pos);
+            if (pattern.equals("door") && !canPlaceDoor(weWorld, pos, op.getBlockData()))
                 return records;
-            }
-
             BlockState state = palette.getRandomState();
             editSession.setBlock(pos, state);
             records.add(new PlacementRecord(pos, state));
 
         } else if (op.getX2() != null && op.getY2() != null && op.getZ2() != null) {
             int x2 = op.getX2(), y2 = op.getY2(), z2 = op.getZ2();
-
             int minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
             int minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
             int minZ = Math.min(z1, z2), maxZ = Math.max(z1, z2);
@@ -171,7 +178,6 @@ public class BlockPlacementEngine {
                             case "line" -> isPointOnLine(x, y, z, x1, y1, z1, x2, y2, z2);
                             default -> true;
                         };
-
                         if (shouldPlace) {
                             BlockVector3 pos = origin.add(x, y, z);
                             BlockState state = palette.getRandomState();
@@ -187,37 +193,28 @@ public class BlockPlacementEngine {
             editSession.setBlock(pos, state);
             records.add(new PlacementRecord(pos, state));
         }
-
         return records;
     }
 
     private static boolean canPlaceDoor(com.sk89q.worldedit.world.World world, BlockVector3 pos, String blockData) {
         try {
-            // Check if this is an upper door half
             if (blockData.contains("half=upper")) {
-                // Check if there's a lower half below
                 BlockState below = world.getBlock(pos.subtract(0, 1, 0));
-                String belowId = below.getBlockType().getId();
-                return belowId.contains("door");
+                return below.getBlockType().getId().contains("door");
             } else if (blockData.contains("half=lower")) {
-                // Check if position is clear and not already a door
                 BlockState current = world.getBlock(pos);
                 BlockState above = world.getBlock(pos.add(0, 1, 0));
-
-                if (current.getBlockType().getId().contains("door")) {
-                    return false; // Already a door here
-                }
-                if (above.getBlockType().getId().contains("door")) {
-                    return false; // Door above
-                }
-                return true;
+                return !current.getBlockType().getId().contains("door")
+                        && !above.getBlockType().getId().contains("door");
             }
         } catch (Exception e) {
-            Logger.warn("Door validation failed: " + e.getMessage());
-        }
+        } // Ignore
         return true;
     }
 
+    // Standard helpers (isPointOnLine, parseBlock, WeightedPalette,
+    // PlacementRecord) remain same
+    // but included for compilation completeness
     private static boolean isPointOnLine(int x, int y, int z, int x1, int y1, int z1, int x2, int y2, int z2) {
         if (x1 == x2 && y1 == y2)
             return x == x1 && y == y1 && z >= Math.min(z1, z2) && z <= Math.max(z1, z2);
@@ -237,7 +234,6 @@ public class BlockPlacementEngine {
             String materialName = blockData.contains("[") ? blockData.substring(0, blockData.indexOf("[")) : blockData;
             if (materialName.startsWith("minecraft:"))
                 materialName = materialName.substring(10);
-
             org.bukkit.Material material = org.bukkit.Material.matchMaterial(materialName);
             if (material != null) {
                 com.sk89q.worldedit.world.block.BlockType blockType = com.sk89q.worldedit.world.block.BlockType.REGISTRY
@@ -257,23 +253,19 @@ public class BlockPlacementEngine {
         public WeightedPalette(String input) {
             if (input == null || input.isEmpty())
                 return;
-
             String[] parts = input.split(",");
             for (String part : parts) {
                 part = part.trim();
                 double weight = 1.0;
                 String blockData = part;
-
                 if (part.contains("%")) {
                     try {
                         int percentIdx = part.indexOf("%");
                         weight = Double.parseDouble(part.substring(0, percentIdx));
                         blockData = part.substring(percentIdx + 1);
                     } catch (Exception e) {
-                        // Ignore
                     }
                 }
-
                 BlockState state = parseBlock(blockData);
                 if (state != null) {
                     states.add(state);
@@ -292,12 +284,10 @@ public class BlockPlacementEngine {
                 return null;
             if (states.size() == 1)
                 return states.get(0);
-
             double r = RANDOM.nextDouble() * totalWeight;
             for (int i = 0; i < cumulativeWeights.size(); i++) {
-                if (r <= cumulativeWeights.get(i)) {
+                if (r <= cumulativeWeights.get(i))
                     return states.get(i);
-                }
             }
             return states.get(0);
         }
