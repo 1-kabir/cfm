@@ -10,8 +10,12 @@ import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.world.block.BlockState;
 import com.sk89q.worldedit.world.block.BlockType;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
+import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.MultipleFacing;
 import org.bukkit.entity.Player;
 
 import java.util.*;
@@ -28,7 +32,7 @@ public class BlockPlacementEngine {
         try (EditSession editSession = WorldEdit.getInstance().newEditSession(weWorld)) {
             Set<BlockVector3> affectedPositions = new HashSet<>();
 
-            // Phase 1: Validate and place all blocks
+            // Phase 1: Validate and place all blocks via WorldEdit
             for (VoxelSchemaParser.BuildOperation op : operations) {
                 List<PlacementRecord> records = handleOperation(editSession, op, origin, weWorld);
                 for (PlacementRecord record : records) {
@@ -36,33 +40,17 @@ public class BlockPlacementEngine {
                 }
             }
 
-            editSession.close();
-
-            // Phase 2: Force neighbor updates via Bukkit
+            // Phase 2: Manual Connection Fix & Physics Update
             Bukkit.getScheduler().runTask(player.getServer().getPluginManager().getPlugin("CFM"), () -> {
-                Set<Chunk> chunksToUpdate = new HashSet<>();
-
                 for (BlockVector3 pos : affectedPositions) {
                     org.bukkit.Location loc = new org.bukkit.Location(world, pos.getX(), pos.getY(), pos.getZ());
-                    org.bukkit.block.Block block = loc.getBlock();
+                    Block block = loc.getBlock();
 
-                    // Update the block and its neighbors
+                    // 1. Explicitly fix connections for Fences, Panes, Walls, etc.
+                    fixVisualConnections(block);
+
+                    // 2. Trigger physics update for everything else (redstone, etc.)
                     block.getState().update(true, true);
-
-                    // Force neighbor updates in all 6 directions
-                    updateNeighbor(world, loc.clone().add(1, 0, 0));
-                    updateNeighbor(world, loc.clone().add(-1, 0, 0));
-                    updateNeighbor(world, loc.clone().add(0, 1, 0));
-                    updateNeighbor(world, loc.clone().add(0, -1, 0));
-                    updateNeighbor(world, loc.clone().add(0, 0, 1));
-                    updateNeighbor(world, loc.clone().add(0, 0, -1));
-
-                    chunksToUpdate.add(loc.getChunk());
-                }
-
-                // Force chunk updates
-                for (Chunk chunk : chunksToUpdate) {
-                    world.refreshChunk(chunk.getX(), chunk.getZ());
                 }
             });
 
@@ -72,15 +60,73 @@ public class BlockPlacementEngine {
         }
     }
 
-    private static void updateNeighbor(World world, org.bukkit.Location loc) {
-        try {
-            org.bukkit.block.Block block = loc.getBlock();
-            if (block != null && !block.getType().isAir()) {
-                block.getState().update(true, false);
+    /**
+     * Manually calculates and sets connection states for MultipleFacing blocks.
+     * This ensures fences/panes connect even if automatic physics fails.
+     */
+    private static void fixVisualConnections(Block block) {
+        BlockData data = block.getBlockData();
+
+        if (data instanceof MultipleFacing) {
+            MultipleFacing facing = (MultipleFacing) data;
+            boolean changed = false;
+
+            // Check all allowed faces for this block type
+            for (BlockFace face : facing.getAllowedFaces()) {
+                if (shouldConnect(block, face)) {
+                    if (!facing.hasFace(face)) {
+                        facing.setFace(face, true);
+                        changed = true;
+                    }
+                } else {
+                    if (facing.hasFace(face)) {
+                        facing.setFace(face, false);
+                        changed = true;
+                    }
+                }
             }
-        } catch (Exception e) {
-            // Ignore
+
+            if (changed) {
+                block.setBlockData(facing, true); // applyPhysics = true
+            }
         }
+    }
+
+    /**
+     * logic for whether a block should connect to a neighbor
+     */
+    private static boolean shouldConnect(Block source, BlockFace face) {
+        Block neighbor = source.getRelative(face);
+        Material sourceMat = source.getType();
+        Material targetMat = neighbor.getType();
+
+        // Always connect to self
+        if (sourceMat == targetMat)
+            return true;
+
+        boolean isFence = sourceMat.name().contains("FENCE");
+        boolean isPane = sourceMat.name().contains("GLASS_PANE") || sourceMat.name().contains("IRON_BARS");
+        boolean isWall = sourceMat.name().contains("WALL");
+
+        if (isFence) {
+            // Fences connect to solid blocks and other fences/gates
+            return targetMat.isSolid() && !targetMat.name().contains("LEAVES") && !targetMat.name().contains("BARRIER")
+                    || targetMat.name().contains("FENCE_GATE");
+        }
+
+        if (isPane) {
+            // Panes connect to other panes and full solid blocks
+            return targetMat.name().contains("GLASS_PANE") || targetMat.name().contains("IRON_BARS")
+                    || (targetMat.isSolid() && targetMat.isOccluding());
+        }
+
+        if (isWall) {
+            // Walls connect to walls, gates, and solid blocks
+            return targetMat.name().contains("WALL") || targetMat.name().contains("FENCE_GATE")
+                    || (targetMat.isSolid() && targetMat.isOccluding());
+        }
+
+        return false;
     }
 
     private static List<PlacementRecord> handleOperation(EditSession editSession, VoxelSchemaParser.BuildOperation op,
