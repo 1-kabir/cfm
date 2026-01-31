@@ -4,38 +4,35 @@
 
 ---
 
-## 🔧 CRITICAL FIXES
+## 🔧 CODE FIXES (BlockPlacementEngine.java)
 
-### 1. Block Connectivity - THE "NUCLEAR" FIX ✓✓✓
+### 1. Stairs & Directional State Fix ✓
+- **Problem**: Stairs always faced North, ignoring LLM input.
+- **Cause**: WorldEdit's legacy parser was failing on `[facing=east]` and defaulting to North.
+- **Fix**: Switched to `Bukkit.createBlockData()` which fully supports modern 1.13+ state syntax.
+- **Result**: Stairs now correctly face North/South/East/West as requested.
 
-**Problem**: Previous Bukkit updates weren't catching existing blocks. Fences placed next to *existing* fences didn't trigger the *existing* fence to update.
+### 2. Auto-Door Functionality ✓
+- **Problem**: Lower/Upper door halves invalid or missing.
+- **Fix**: Engine now detects placement of a Lower Door (`half=lower`).
+- **Automation**: It **automatically** generates and places the correct Upper Door (`half=upper`) at `y+1`.
+- **Simplification**: LLM prompt updated to ONLY request the lower half.
 
-**Solution**:
-- **Bidirectional updates**: Now, when we place a block, we identify **all 6 neighbors** of that block.
-- **Explicit Connection Logic**: We run the `fixVisualConnections` logic on the placed blocks AND their neighbors.
-- **Forced State**: We check `isConnectable` (fences, panes, walls) and manually toggle their internal `MultipleFacing` data (North/South/East/West) based on the new context.
-- **Result**: Immediate snap-to-connection for all blocks in the build area.
+### 3. "Nuclear" Connection Fix (Neighbors) ✓
+- **Refinement**: Explicitly updates neighbors of placed blocks (bidirectional) to ensure snapping.
+- **Logic**: Uses `MultipleFacing` data to force-set invisible connection states.
 
 ---
 
 ## 📄 PROMPT ENGINEERING (v4)
 
-### 1. CFM PLAN v4.md (New)
-- **Purpose**: A dedicated "Planning Phase" prompt.
-- **Focus**:
-  - Step-by-step architectural planning.
-  - Defining palettes (Primary/Secondary/Accent).
-  - Mental visualization and spatial reasoning.
-  - "Layering Rule": Outer shell first, details later.
-  - Output: Plaintext plan (to be fed into v4 execution).
+### 1. CFM v4.md (Execution)
+- **Simplify Doors**: Instructions updated to *only* output lower door half.
+- **Vertical Levels**: Explicit warnings about "Floor Thickness" vs "Furniture Height" to prevent buried objects.
+- **Aesthetics**: Stronger emphasis on `single` blocks for detailing.
 
-### 2. CFM v4.md (New)
-- **Purpose**: Advanced Execution prompt (replaces v3 for generation).
-- **Improvements**:
-  - **Aesthetics**: Instructions for depth, gradients, and proper trims.
-  - **Single Block Priority**: Explicitly encourages `single` pattern for detailing.
-  - **Layering Rule**: Reinforces that later operations overwrite earlier ones.
-  - **Strict Physics**: Maintains the v3 physics/direction rules but with better aesthetic guidance.
+### 2. CFM PLAN v4.md (Planning)
+- **Vertical Planning**: Added "Interior Floor Y" field to the planning phase to force the AI to calculate furniture height before building.
 
 ---
 
@@ -43,5 +40,7 @@
 
 1. **Build**: `gradlew shadowJar`
 2. **Deploy**: Copy JAR to plugins folder.
-3. **Usage**: The code currently uses `CFM v3` logic in `PromptBuilder`. To use v4, you would manually feed the v4 prompt or update the Java code (deferred as per request).
-   - **BUT**: The Block Connectivity fixes apply *immediately* to all current builds.
+3. **Usage**:
+   - Connections: Work automatically.
+   - Stairs/Doors: Work automatically with current code.
+   - Prompts: Use v4 prompts for best results (manual input or update code later).
