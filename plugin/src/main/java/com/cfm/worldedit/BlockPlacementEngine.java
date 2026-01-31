@@ -16,6 +16,7 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.MultipleFacing;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
 import java.util.*;
 
@@ -27,49 +28,64 @@ public class BlockPlacementEngine {
             BlockVector3 origin) {
         World world = player.getWorld();
         com.sk89q.worldedit.world.World weWorld = BukkitAdapter.adapt(world);
+        Set<BlockVector3> affectedPositions = new HashSet<>();
 
+        // Phase 1: Place all blocks via WorldEdit
+        // Using try-with-resources ensures the EditSession is closed and flushed
+        // automatically
         try (EditSession editSession = WorldEdit.getInstance().newEditSession(weWorld)) {
-            Set<BlockVector3> affectedPositions = new HashSet<>();
-
-            // Phase 1: Validate and place all blocks via WorldEdit
             for (VoxelSchemaParser.BuildOperation op : operations) {
                 List<PlacementRecord> records = handleOperation(editSession, op, origin, weWorld);
                 for (PlacementRecord record : records) {
                     affectedPositions.add(record.position);
                 }
             }
+        } catch (Exception e) {
+            Logger.error("Failed to place build via WorldEdit", e);
+            return;
+        }
 
-            // Phase 2: Manual Connection Fix & Physics Update (Now targeting Neighbors
-            // too!)
-            Bukkit.getScheduler().runTask(player.getServer().getPluginManager().getPlugin("CFM"), () -> {
-                Set<BlockVector3> toUpdate = new HashSet<>(affectedPositions);
+        // Phase 2: Manual Connection Fix & Physics Update
+        // This runs after the EditSession has closed and flushed the blocks to the
+        // world
+        Plugin plugin = Bukkit.getPluginManager().getPlugin("CFM");
+        if (plugin == null) {
+            Logger.error("CFM plugin not found, skipping neighbor updates");
+            return;
+        }
 
-                // Add all neighbors of placed blocks to the update list
-                // This ensures existing fences snap to the new ones
-                for (BlockVector3 pos : affectedPositions) {
-                    toUpdate.add(pos.add(1, 0, 0));
-                    toUpdate.add(pos.add(-1, 0, 0));
-                    toUpdate.add(pos.add(0, 0, 1));
-                    toUpdate.add(pos.add(0, 0, -1));
-                }
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Set<BlockVector3> toUpdate = new HashSet<>(affectedPositions);
 
-                for (BlockVector3 pos : toUpdate) {
+            // Add all horizontal neighbors of placed blocks to the update list
+            // This ensures existing fences/panes snap to the new ones
+            for (BlockVector3 pos : affectedPositions) {
+                toUpdate.add(pos.add(1, 0, 0));
+                toUpdate.add(pos.add(-1, 0, 0));
+                toUpdate.add(pos.add(0, 0, 1));
+                toUpdate.add(pos.add(0, 0, -1));
+            }
+
+            for (BlockVector3 pos : toUpdate) {
+                try {
                     org.bukkit.Location loc = new org.bukkit.Location(world, pos.getX(), pos.getY(), pos.getZ());
                     Block block = loc.getBlock();
 
+                    // 1. Manually calculate and set visual connections for MultipleFacing blocks
                     if (isConnectable(block.getType())) {
                         fixVisualConnections(block);
                     }
 
-                    // Trigger physics update for everything
+                    // 2. Trigger physics/state update for the block
                     block.getState().update(true, true);
+                } catch (Exception e) {
+                    // Silently ignore errors for individual block updates to prevent stopping the
+                    // whole process
                 }
-            });
+            }
+        });
 
-            Logger.info("Build placed for player " + player.getName() + " (" + operations.size() + " operations)");
-        } catch (Exception e) {
-            Logger.error("Failed to place build", e);
-        }
+        Logger.info("Build placed for player " + player.getName() + " (" + operations.size() + " operations)");
     }
 
     private static boolean isConnectable(Material mat) {
@@ -78,9 +94,6 @@ public class BlockPlacementEngine {
                 name.contains("WALL") || name.contains("IRON_BARS");
     }
 
-    /**
-     * Manually calculates and sets connection states for MultipleFacing blocks.
-     */
     private static void fixVisualConnections(Block block) {
         BlockData data = block.getBlockData();
 
@@ -108,16 +121,15 @@ public class BlockPlacementEngine {
         }
     }
 
-    /**
-     * logic for whether a block should connect to a neighbor
-     */
     private static boolean shouldConnect(Block source, BlockFace face) {
         Block neighbor = source.getRelative(face);
         Material sourceMat = source.getType();
         Material targetMat = neighbor.getType();
 
-        if (neighbor.getType().isAir())
+        if (targetMat.isAir())
             return false;
+
+        // Always connect to self
         if (sourceMat == targetMat)
             return true;
 
@@ -126,15 +138,18 @@ public class BlockPlacementEngine {
         boolean isWall = sourceMat.name().contains("WALL");
 
         if (isFence) {
+            // Fences connect to solid blocks and other fences/gates
             return (targetMat.isSolid() && targetMat.isOccluding()) || targetMat.name().contains("FENCE_GATE");
         }
 
         if (isPane) {
+            // Panes connect to other panes and full solid blocks
             return targetMat.name().contains("GLASS_PANE") || targetMat.name().contains("IRON_BARS")
                     || (targetMat.isSolid() && targetMat.isOccluding());
         }
 
         if (isWall) {
+            // Walls connect to walls, gates, and solid blocks
             return targetMat.name().contains("WALL") || targetMat.name().contains("FENCE_GATE")
                     || (targetMat.isSolid() && targetMat.isOccluding());
         }
@@ -208,13 +223,10 @@ public class BlockPlacementEngine {
                         && !above.getBlockType().getId().contains("door");
             }
         } catch (Exception e) {
-        } // Ignore
+        }
         return true;
     }
 
-    // Standard helpers (isPointOnLine, parseBlock, WeightedPalette,
-    // PlacementRecord) remain same
-    // but included for compilation completeness
     private static boolean isPointOnLine(int x, int y, int z, int x1, int y1, int z1, int x2, int y2, int z2) {
         if (x1 == x2 && y1 == y2)
             return x == x1 && y == y1 && z >= Math.min(z1, z2) && z <= Math.max(z1, z2);
