@@ -51,6 +51,20 @@ tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
+processResources {
+    filteringCharset = 'UTF-8'
+    
+    // Copy markdown files from prompts directory to resources
+    from('../prompts') {
+        include 'CFM v4.md'
+        include 'CFM PLAN v4.md'
+        
+        // Rename them to the expected names for the PromptBuilder
+        rename 'CFM v4.md', 'build.md'
+        rename 'CFM PLAN v4.md', 'plan.md'
+    }
+}
+
 shadowJar {
     archiveBaseName.set('CFM')
     archiveClassifier.set('')

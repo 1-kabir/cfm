@@ -2,3 +2,4 @@ node_modules/
 .vscode/
 testing/
 prompts/
+firebase-debug.log

@@ -1,6 +1,7 @@
 package com.cfm.command;
 
 import com.cfm.CFM;
+import com.cfm.model.Build;
 import com.cfm.model.Conversation;
 import com.cfm.schema.VoxelSchemaParser;
 import com.cfm.schema.WorldEditToVoxelParser;
@@ -10,13 +11,11 @@ import com.cfm.worldedit.BlockPlacementEngine;
 import com.cfm.worldedit.WorldEditSelectionHelper;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldedit.regions.Region;
-import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -53,22 +52,15 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
 
         String subCommand = args[0].toLowerCase();
         switch (subCommand) {
-            case "tool" -> handleTool(player);
             case "create" -> handleCreate(player, args);
             case "parse" -> handleParse(player);
-            case "jsonparse" -> handleJsonParse(player, args);
+            case "paste" -> handlePaste(player, args); // Renamed from jsonparse
             case "list" -> handleList(player);
             case "reload" -> handleReload(player);
             default -> player.sendMessage("§8[§bCFM§8] §cUnknown subcommand. Use §f/cfm help");
         }
 
         return true;
-    }
-
-    private void handleTool(Player player) {
-        ItemStack wand = new ItemStack(Material.WOODEN_AXE);
-        player.getInventory().addItem(wand);
-        player.sendMessage("§8[§bCFM§8] §aProvided WorldEdit wand. §7Use left/right click to select a region.");
     }
 
     private void handleCreate(Player player, String[] args) {
@@ -79,43 +71,28 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
 
         String prompt = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
 
-        if (!WorldEditSelectionHelper.hasValidSelection(player)) {
-            player.sendMessage("§8[§bCFM§8] §cPlease select a region first with WorldEdit!");
-            return;
-        }
-
-        Region region = WorldEditSelectionHelper.getPlayerSelection(player);
-        BlockVector3 origin = region.getMinimumPoint();
-
-        player.sendMessage("§8[§bCFM§8] §eThinking... §7Generating your structure...");
+        // No selection required. Uses player location as origin for relative terms if
+        // needed.
+        player.sendMessage("§8[§bCFM§8] §eThinking... §7Generating your plan...");
 
         Conversation conv = Conversation.builder()
                 .userUuid(player.getUniqueId().toString())
                 .userUsername(player.getName())
                 .title(prompt.length() > 30 ? prompt.substring(0, 30) + "..." : prompt)
                 .status(Conversation.ConversationStatus.ACTIVE)
+                .currentMode(Conversation.ConversationMode.PLANNING) // Default to Planning
                 .build();
 
         int convId = CFM.getInstance().getConversationDAO().createConversation(conv);
 
         conversationService.sendMessage(convId, prompt).thenAccept(response -> {
             if (response == null) {
-                player.sendMessage("§8[§bCFM§8] §cAI failed to generate a build. Try again.");
+                player.sendMessage("§8[§bCFM§8] §cAI failed to respond. Try again.");
                 return;
             }
-
-            try {
-                VoxelSchemaParser.BuildSchema schema = VoxelSchemaParser.parseFullSchema(response);
-                if (schema.getBlocks().isEmpty()) {
-                    player.sendMessage("§8[§dAI§8] §f" + response);
-                } else {
-                    BlockPlacementEngine.placeBuild(player, schema.getBlocks(), origin);
-                    player.sendMessage(
-                            "§8[§bCFM§8] §aBuild complete! §7(" + schema.getBlocks().size() + " blocks placed)");
-                }
-            } catch (Exception e) {
-                player.sendMessage("§8[§dAI§8] §f" + response);
-            }
+            // In Planning mode, we just show the plan info
+            player.sendMessage("§8[§bCFM§8] §aPlan generated! §7ID: #" + convId);
+            player.sendMessage("§7Check the Web UI to review and build.");
         });
     }
 
@@ -135,46 +112,62 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
         }
     }
 
-    private void handleJsonParse(Player player, String[] args) {
+    private void handlePaste(Player player, String[] args) {
         if (args.length < 2) {
-            player.sendMessage("§8[§bCFM§8] §cUsage: §f/cfm jsonparse <url>");
+            player.sendMessage("§8[§bCFM§8] §cUsage: §f/cfm paste <build_id|url>");
             return;
         }
 
-        String url = args[1];
-        player.sendMessage("§8[§bCFM§8] §eFetching JSON from remote source...");
+        String input = args[1];
+        BlockVector3 origin = BlockVector3.at(
+                player.getLocation().getBlockX(),
+                player.getLocation().getBlockY(),
+                player.getLocation().getBlockZ());
 
-        fetchJson(url).thenAccept(json -> {
-            if (json == null) {
-                player.sendMessage("§8[§bCFM§8] §cFailed to fetch or read from URL.");
+        // Check if input is integer (Build ID)
+        try {
+            int buildId = Integer.parseInt(input);
+            Build build = CFM.getInstance().getBuildDAO().getBuild(buildId);
+            if (build != null && build.getSchemaData() != null) {
+                player.sendMessage("§8[§bCFM§8] §eLoading build #" + buildId + "...");
+                placeSchema(player, build.getSchemaData(), origin);
+                return;
+            } else {
+                player.sendMessage("§8[§bCFM§8] §cBuild #" + buildId + " not found or empty.");
+                return;
+            }
+        } catch (NumberFormatException e) {
+            // Not an ID, treat as URL
+            player.sendMessage("§8[§bCFM§8] §eFetching JSON from remote source...");
+            fetchJson(input).thenAccept(json -> {
+                if (json == null) {
+                    player.sendMessage("§8[§bCFM§8] §cFailed to fetch from URL.");
+                    return;
+                }
+                placeSchema(player, json, origin);
+            });
+        }
+    }
+
+    private void placeSchema(Player player, String json, BlockVector3 origin) {
+        try {
+            VoxelSchemaParser.BuildSchema schema = VoxelSchemaParser.parseFullSchema(json);
+            if (schema.getBlocks().isEmpty()) {
+                player.sendMessage("§8[§bCFM§8] §cThe JSON provided contains no valid block data.");
                 return;
             }
 
-            try {
-                VoxelSchemaParser.BuildSchema schema = VoxelSchemaParser.parseFullSchema(json);
-                if (schema.getBlocks().isEmpty()) {
-                    player.sendMessage("§8[§bCFM§8] §cThe JSON provided contains no valid block data.");
-                    return;
-                }
+            String name = schema.getMetadata() != null ? schema.getMetadata().getName() : "Structure";
+            player.sendMessage("§8[§bCFM§8] §aManifesting §f" + name + " §7at your location...");
 
-                String name = schema.getMetadata() != null ? schema.getMetadata().getName() : "Remote Build";
-                player.sendMessage("§8[§bCFM§8] §aManifesting §f" + name + " §7at your location...");
+            BlockPlacementEngine.placeBuild(player, schema.getBlocks(), origin);
+            player.sendMessage(
+                    "§8[§bCFM§8] §aConstruction finalized! §7(" + schema.getBlocks().size() + " blocks placed)");
 
-                // Place at player location as origin
-                BlockVector3 origin = BlockVector3.at(
-                        player.getLocation().getBlockX(),
-                        player.getLocation().getBlockY(),
-                        player.getLocation().getBlockZ());
-
-                BlockPlacementEngine.placeBuild(player, schema.getBlocks(), origin);
-                player.sendMessage(
-                        "§8[§bCFM§8] §aConstruction finalized! §7(" + schema.getBlocks().size() + " blocks placed)");
-
-            } catch (Exception e) {
-                player.sendMessage("§8[§bCFM§8] §cError parsing schema: §7" + e.getMessage());
-                Logger.error("Schema parse error", e);
-            }
-        });
+        } catch (Exception e) {
+            player.sendMessage("§8[§bCFM§8] §cError parsing schema: §7" + e.getMessage());
+            Logger.error("Schema parse error", e);
+        }
     }
 
     private CompletableFuture<String> fetchJson(String url) {
@@ -205,7 +198,8 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
         }
         player.sendMessage("§b--- Your AI Conversations ---");
         for (Conversation conv : conversations) {
-            player.sendMessage("§8[§7#" + conv.getId() + "§8] §f" + conv.getTitle());
+            player.sendMessage(
+                    "§8[§7#" + conv.getId() + "§8] §f" + conv.getTitle() + " §7[" + conv.getCurrentMode() + "]");
         }
     }
 
@@ -222,11 +216,10 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
     private void sendHelp(Player player) {
         player.sendMessage("§b§lCFM §8- §fAI Build Assistant");
         player.sendMessage(" ");
-        player.sendMessage("§b/cfm tool §8- §7Get selection wand");
-        player.sendMessage("§b/cfm create <prompt> §8- §7Generate build");
-        player.sendMessage("§b/cfm parse §8- §7Selection to JSON (w/ Bounds)");
-        player.sendMessage("§b/cfm jsonparse <url> §8- §7Build from URL");
-        player.sendMessage("§b/cfm list §8- §7View your chats");
+        player.sendMessage("§b/cfm create <prompt> §8- §7Start new plan");
+        player.sendMessage("§b/cfm paste <id|url> §8- §7Paste build at feet");
+        player.sendMessage("§b/cfm parse §8- §7Selection to JSON");
+        player.sendMessage("§b/cfm list §8- §7View chats");
         player.sendMessage("§b/cfm reload §8- §7Reload plugin");
     }
 
@@ -234,7 +227,7 @@ public class CFMCommand implements CommandExecutor, TabCompleter {
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
             @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("tool", "create", "parse", "jsonparse", "list", "help", "reload").stream()
+            return Arrays.asList("create", "paste", "parse", "list", "help", "reload").stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
         }

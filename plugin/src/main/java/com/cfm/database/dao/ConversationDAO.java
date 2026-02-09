@@ -17,14 +17,16 @@ public class ConversationDAO {
     }
 
     public int createConversation(Conversation conversation) {
-        String sql = "INSERT INTO conversations (user_uuid, user_username, title, status, metadata) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO conversations (user_uuid, user_username, title, status, current_mode, metadata) VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement pstmt = dbManager.getConnection().prepareStatement(sql,
                 Statement.RETURN_GENERATED_KEYS)) {
             pstmt.setString(1, conversation.getUserUuid());
             pstmt.setString(2, conversation.getUserUsername());
             pstmt.setString(3, conversation.getTitle());
             pstmt.setString(4, conversation.getStatus().name());
-            pstmt.setString(5, conversation.getMetadata());
+            pstmt.setString(5,
+                    conversation.getCurrentMode() != null ? conversation.getCurrentMode().name() : "PLANNING");
+            pstmt.setString(6, conversation.getMetadata());
             pstmt.executeUpdate();
 
             try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
@@ -69,14 +71,14 @@ public class ConversationDAO {
         return conversations;
     }
 
-    public void updateConversationStatus(int id, Conversation.ConversationStatus status) {
-        String sql = "UPDATE conversations SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+    public void updateConversationMode(int id, Conversation.ConversationMode mode) {
+        String sql = "UPDATE conversations SET current_mode = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
         try (PreparedStatement pstmt = dbManager.getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, status.name());
+            pstmt.setString(1, mode.name());
             pstmt.setInt(2, id);
             pstmt.executeUpdate();
         } catch (SQLException e) {
-            Logger.error("Error updating conversation status!", e);
+            Logger.error("Error updating conversation mode!", e);
         }
     }
 
@@ -87,6 +89,7 @@ public class ConversationDAO {
                 .userUsername(rs.getString("user_username"))
                 .title(rs.getString("title"))
                 .status(Conversation.ConversationStatus.valueOf(rs.getString("status")))
+                .currentMode(Conversation.ConversationMode.valueOf(rs.getString("current_mode")))
                 .createdAt(rs.getTimestamp("created_at"))
                 .updatedAt(rs.getTimestamp("updated_at"))
                 .metadata(rs.getString("metadata"))

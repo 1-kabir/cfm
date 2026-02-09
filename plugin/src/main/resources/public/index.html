@@ -44,6 +44,17 @@
 
         <!-- Main Content -->
         <main class="main-content">
+            <div id="chat-header" class="chat-header hidden">
+                <div class="mode-indicator">
+                    <span id="current-mode-badge" class="badge">PLANNING</span>
+                    <h3 id="chat-title">New Conversation</h3>
+                </div>
+                <div class="header-actions">
+                    <button id="mode-switch-btn" class="secondary-btn">Switch to Build</button>
+                    <button id="paste-code-btn" class="primary-btn hidden">Copy Paste Command</button>
+                </div>
+            </div>
+
             <div class="messages-container" id="chat-messages">
                 <!-- Welcome State -->
                 <div id="empty-state" class="empty-state">

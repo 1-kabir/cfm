@@ -79,6 +79,13 @@ public class WebServer {
                     .thenApply(res -> ctx.json("{\"response\": \"" + res + "\"}")));
         });
 
+        app.post("/api/conversations/{id}/mode", ctx -> {
+            int id = Integer.parseInt(ctx.pathParam("id"));
+            ModeRequest req = ctx.bodyAsClass(ModeRequest.class);
+            conversationService.switchMode(id, Conversation.ConversationMode.valueOf(req.getMode()));
+            ctx.status(200).json("{\"status\": \"ok\"}");
+        });
+
         // Builds
         app.get("/api/builds", ctx -> {
             String convIdStr = ctx.queryParam("conversation_id");
@@ -105,5 +112,10 @@ public class WebServer {
     @Getter
     private static class MessageRequest {
         private String message;
+    }
+
+    @Getter
+    private static class ModeRequest {
+        private String mode;
     }
 }

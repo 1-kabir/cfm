@@ -45,10 +45,18 @@ public class DatabaseManager {
                     "user_username TEXT NOT NULL," +
                     "title TEXT," +
                     "status TEXT DEFAULT 'ACTIVE'," +
+                    "current_mode TEXT DEFAULT 'PLANNING'," + // New column
                     "created_at DATETIME DEFAULT CURRENT_TIMESTAMP," +
                     "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP," +
                     "metadata TEXT" +
                     ")");
+
+            // Migration: Add current_mode if missing (for existing dbs)
+            try {
+                statement.execute("ALTER TABLE conversations ADD COLUMN current_mode TEXT DEFAULT 'PLANNING'");
+            } catch (SQLException e) {
+                // Column likely already exists, ignore
+            }
 
             // Builds Table
             statement.execute("CREATE TABLE IF NOT EXISTS builds (" +

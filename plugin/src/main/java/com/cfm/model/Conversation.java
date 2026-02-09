@@ -12,11 +12,16 @@ public class Conversation {
     private String userUsername;
     private String title;
     private ConversationStatus status;
+    private ConversationMode currentMode; // New field
     private Timestamp createdAt;
     private Timestamp updatedAt;
     private String metadata; // JSON metadata
 
     public enum ConversationStatus {
         ACTIVE, COMPLETED, CANCELLED
+    }
+
+    public enum ConversationMode {
+        PLANNING, BUILDING
     }
 }

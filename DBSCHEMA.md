@@ -26,6 +26,7 @@ CREATE TABLE conversations (
     user_username TEXT NOT NULL, -- Minecraft username
     title TEXT, -- Auto-generated title based on first user message
     status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed', 'cancelled')),
+    current_mode TEXT DEFAULT 'PLANNING' CHECK(current_mode IN ('PLANNING', 'BUILDING')), -- New mode tracking
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     metadata TEXT -- Additional conversation metadata (workflow used, etc.) stored as JSON
