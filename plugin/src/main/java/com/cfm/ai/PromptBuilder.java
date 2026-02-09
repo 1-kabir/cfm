@@ -32,17 +32,18 @@ public class PromptBuilder {
 
     private static String loadPromptFile(PromptMode mode) {
         String fileName = (mode == PromptMode.PLANNING) ? "plan.md" : "build.md";
-        File file = new File(CFM.getInstance().getDataFolder().getParentFile(), fileName); // Plugin root
-
+        
         try {
-            if (file.exists()) {
-                return Files.readString(file.toPath());
+            // Read from JAR resources
+            var inputStream = PromptBuilder.class.getClassLoader().getResourceAsStream(fileName);
+            if (inputStream != null) {
+                return new String(inputStream.readAllBytes());
             } else {
-                Logger.error("Prompt file not found: " + file.getAbsolutePath());
+                Logger.error("Prompt file not found in resources: " + fileName);
                 return "Error: System prompt file missing.";
             }
         } catch (IOException e) {
-            Logger.error("Failed to read prompt file: " + fileName, e);
+            Logger.error("Failed to read prompt file from resources: " + fileName, e);
             return "Error: Failed to read system prompt.";
         }
     }
